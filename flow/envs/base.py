@@ -399,6 +399,10 @@ class Env(gym.Env, metaclass=ABCMeta):
         done = (self.time_counter >= self.env_params.sims_per_step *
                 (self.env_params.warmup_steps + self.env_params.horizon)
                 or crash)
+        
+        #TODO for debug
+        done = self.time_counter >= self.env_params.sims_per_step * \
+                (self.env_params.warmup_steps + self.env_params.horizon)
 
         # compute the info for each agent
         infos = {}
