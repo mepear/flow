@@ -192,6 +192,11 @@ class KernelVehicle(object, metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def dispatchTaxi(self, veh_id, reservation_id):
+        """Dispath vehicle of veh_id to reservation id"""
+        pass
+
     ###########################################################################
     # Methods to visually distinguish vehicles by {RL, observed, unobserved}  #
     ###########################################################################

@@ -653,7 +653,10 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
                 key: str(params['type_params'][key])
                 for key in params['type_params']
             }
-            add.append(E('vType', id=params['veh_id'], **type_params_str))
+            e = E('vType', id=params['veh_id'], **type_params_str)
+            if params['taxi']:
+                e.append(E('param', key='has.taxi.device', value='true'))
+            add.append(e)
 
         # add (optionally) the traffic light properties to the .add.xml file
         num_traffic_lights = len(list(traffic_lights.get_properties().keys()))
@@ -725,6 +728,7 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
                     add.append(e)
 
         printxml(add, self.cfg_path + self.addfn)
+        print('add.xml', self.cfg_path + self.addfn)
 
         # this is the data that we will pass to the *.gui.cfg file
         gui = E('viewsettings')

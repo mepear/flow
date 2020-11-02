@@ -153,6 +153,20 @@ vehicles.add(
     ),
     initial_speed=0,
     num_vehicles=20)
+vehicles.add(
+    veh_id="taxi",
+    acceleration_controller=(IDMController, {}),
+    routing_controller=(MinicityRouter, {}),
+    car_following_params=SumoCarFollowingParams(
+        min_gap=2.5,
+        decel=7.5,  # avoid collisions at emergency stops
+    ),
+    lane_change_params=SumoLaneChangeParams(
+        lane_change_mode="no_lc_safe",
+    ),
+    initial_speed=0,
+    num_vehicles=1,
+    is_taxi=True)
 
 env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
 

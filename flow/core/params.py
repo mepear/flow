@@ -262,6 +262,7 @@ class VehicleParams:
             num_vehicles=0,
             car_following_params=None,
             lane_change_params=None,
+            is_taxi=False,
             color=None):
         """Add a sequence of vehicles to the list of vehicles in the network.
 
@@ -301,6 +302,7 @@ class VehicleParams:
         type_params = {}
         type_params.update(car_following_params.controller_params)
         type_params.update(lane_change_params.controller_params)
+        type_params['vClass'] = 'taxi' if is_taxi else 'passenger'
 
         # This dict will be used when trying to introduce new vehicles into
         # the network via a Flow. It is passed to the vehicle kernel object
@@ -361,7 +363,7 @@ class VehicleParams:
         # increase the number of unique types of vehicles in the network, and
         # add the type to the list of types
         self.num_types += 1
-        self.types.append({"veh_id": veh_id, "type_params": type_params})
+        self.types.append({"veh_id": veh_id, "type_params": type_params, "taxi": is_taxi})
 
     def get_type(self, veh_id):
         """Return the type of a specified vehicle.

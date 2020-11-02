@@ -741,7 +741,8 @@ class TraCIVehicle(KernelVehicle):
             if edge:
                 if edge_dict[edge] is None:
                     edge_dict[edge] = [[] for _ in range(max_lanes)]
-                edge_dict[edge][lane].append((veh_id, pos))
+                if 0 <= lane < max_lanes:
+                    edge_dict[edge][lane].append((veh_id, pos))
 
         # sort all lanes in each edge by position
         for edge in tot_list:
@@ -1177,3 +1178,6 @@ class TraCIVehicle(KernelVehicle):
         """See parent class."""
         # TODO : Brent
         return 0
+
+    def dispatchTaxi(self, veh_id, reservation_id):
+        self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation_id])
