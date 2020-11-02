@@ -1,7 +1,7 @@
 """Script containing the base simulation kernel class."""
 
 
-class KernelSimulation(object):
+class KernelSimulation(object): # TODO: add person
     """Base simulation kernel.
 
     The simulation kernel is responsible for generating the simulation and

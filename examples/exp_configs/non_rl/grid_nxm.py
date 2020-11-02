@@ -2,7 +2,7 @@
 from flow.controllers import GridRouter, IDMController, RLController
 from flow.controllers.routing_controllers import MinicityRouter
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
-from flow.core.params import VehicleParams
+from flow.core.params import VehicleParams, PersonParams
 from flow.core.params import TrafficLightParams
 from flow.core.params import SumoCarFollowingParams, SumoLaneChangeParams
 from flow.core.params import InFlows
@@ -121,7 +121,7 @@ def get_non_flow_params(enter_speed, add_net_params):
 
     return initial, net
 
-
+persons = PersonParams()
 vehicles = VehicleParams()
 # vehicles.add(
 #     veh_id="human",
@@ -232,6 +232,7 @@ flow_params = dict(
     # vehicles to be placed in the network at the start of a rollout (see
     # flow.core.params.VehicleParams)
     veh=vehicles,
+    per=persons,
 
     # parameters specifying the positioning of vehicles upon initialization/
     # reset (see flow.core.params.InitialConfig)

@@ -4,7 +4,7 @@ from flow.core.kernel.traffic_light import KernelTrafficLight
 import traci.constants as tc
 
 
-class TraCITrafficLight(KernelTrafficLight):
+class TraCITrafficLight(KernelTrafficLight): # TODO: update kernel api
     """Sumo traffic light kernel.
 
     Implements all methods discussed in the base traffic light kernel class.

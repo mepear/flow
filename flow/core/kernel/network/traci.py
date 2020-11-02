@@ -30,7 +30,7 @@ def _inputs(net=None, rou=None, add=None, gui=None):
     return inp
 
 
-class TraCIKernelNetwork(BaseKernelNetwork):
+class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
     """Base network kernel for sumo-based simulations.
 
     This class initializes a new network. Networks are used to specify

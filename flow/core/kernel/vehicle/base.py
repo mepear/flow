@@ -105,11 +105,6 @@ class KernelVehicle(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def reset(self):
-        """Reset any additional state that needs to be reset."""
-        pass
-
-    @abstractmethod
     def remove(self, veh_id):
         """Remove a vehicle.
 

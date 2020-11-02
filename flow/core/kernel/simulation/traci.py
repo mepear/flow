@@ -18,7 +18,7 @@ import csv
 RETRIES_ON_ERROR = 10
 
 
-class TraCISimulation(KernelSimulation):
+class TraCISimulation(KernelSimulation): # TODO: add person & update kernel api
     """Sumo simulation kernel.
 
     Extends flow.core.kernel.simulation.KernelSimulation
@@ -189,7 +189,8 @@ class TraCISimulation(KernelSimulation):
                     sumo_binary, "-c", network.cfg,
                     "--remote-port", str(sim_params.port),
                     "--num-clients", str(sim_params.num_clients),
-                    "--step-length", str(sim_params.sim_step)
+                    "--step-length", str(sim_params.sim_step),
+                    "--device.taxi.dispatch-algorithm", str(sim_params.taxi_dispatch_alg)
                 ]
 
                 # use a ballistic integration step (if request)

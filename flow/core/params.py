@@ -374,6 +374,35 @@ class VehicleParams:
         return self.__vehicles[veh_id]["type"]
 
 
+# TODO: flow.core.params.PersonParams
+class PersonParams:
+    """Base person class.
+
+    This is used to describe the state of all persons in the network.
+    State information on the persons for a given time step can be set or
+    retrieved from this class.
+    """
+
+    def __init__(self):
+        """Instantiate the base person class."""
+        self.ids = []  # ids of all persons
+
+        # persons: Key = Person ID, Value = Dictionary describing the person
+        # Ordered dictionary used to keep neural net inputs in order
+        self.__persons = collections.OrderedDict()
+
+        #: total number of persons in the network
+        self.num_persons = 0
+        #: int : number of unique types of persons in the network
+        self.num_types = 1
+        #: list of str : types of persons in the network
+        self.types = [{"per_id": 'request'}]
+        
+        #: list : initial state of the persons class, used for serialization
+        #: purposes
+        self.initial = []
+
+
 class SimParams(object):
     """Simulation-specific parameters.
 
@@ -422,7 +451,8 @@ class SimParams(object):
                  sight_radius=25,
                  show_radius=False,
                  pxpm=2,
-                 force_color_update=False):
+                 force_color_update=False,
+                 taxi_dispatch_alg='traci'):
         """Instantiate SimParams."""
         self.sim_step = sim_step
         self.render = render
@@ -433,6 +463,7 @@ class SimParams(object):
         self.pxpm = pxpm
         self.show_radius = show_radius
         self.force_color_update = force_color_update
+        self.taxi_dispatch_alg = taxi_dispatch_alg
 
 
 class AimsunParams(SimParams):

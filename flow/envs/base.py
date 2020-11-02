@@ -165,6 +165,7 @@ class Env(gym.Env, metaclass=ABCMeta):
 
         # initial the vehicles kernel using the VehicleParams object
         self.k.vehicle.initialize(deepcopy(self.network.vehicles))
+        self.k.person.initialize(deepcopy(self.network.persons))
 
         # initialize the simulation using the simulation kernel. This will use
         # the network kernel as an input in order to determine what network
@@ -180,7 +181,7 @@ class Env(gym.Env, metaclass=ABCMeta):
         # dynamically
         self.available_routes = self.k.network.rts
 
-        # store the initial vehicle ids
+        # store the initial vehicle and person ids
         self.initial_ids = deepcopy(self.network.vehicles.ids)
 
         # store the initial state of the vehicles kernel (needed for restarting
@@ -190,6 +191,14 @@ class Env(gym.Env, metaclass=ABCMeta):
         self.initial_vehicles = deepcopy(self.k.vehicle)
         self.k.vehicle.kernel_api = self.k.kernel_api
         self.k.vehicle.master_kernel = self.k
+
+        # store the initial state of the persons kernel (needed for restarting
+        # the simulation)
+        self.k.person.kernel_api = None
+        self.k.person.master_kernel = None
+        self.initial_persons = deepcopy(self.k.person)
+        self.k.person.kernel_api = self.k.kernel_api
+        self.k.person.master_kernel = self.k
 
         self.setup_initial_state()
 
@@ -260,6 +269,7 @@ class Env(gym.Env, metaclass=ABCMeta):
 
         self.k.network.generate_network(self.network)
         self.k.vehicle.initialize(deepcopy(self.network.vehicles))
+        self.k.person.initialize(deepcopy(self.network.persons))
         kernel_api = self.k.simulation.start_simulation(
             network=self.k.network, sim_params=self.sim_params)
         self.k.pass_api(kernel_api)
@@ -361,6 +371,10 @@ class Env(gym.Env, metaclass=ABCMeta):
 
             self.k.vehicle.choose_routes(routing_ids, routing_actions)
 
+            # TODO: perform actions for controlled humans
+            
+            #############################################
+
             self.apply_rl_actions(rl_actions)
 
             self.additional_command()
@@ -420,8 +434,8 @@ class Env(gym.Env, metaclass=ABCMeta):
         """Reset the environment.
 
         This method is performed in between rollouts. It resets the state of
-        the environment, and re-initializes the vehicles in their starting
-        positions.
+        the environment, and re-initializes the vehicles and persons in their 
+        starting positions.
 
         If "shuffle" is set to True in InitialConfig, the initial positions of
         vehicles is recalculated and the vehicles are shuffled.

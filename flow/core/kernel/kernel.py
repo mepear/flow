@@ -4,12 +4,13 @@ import warnings
 from flow.core.kernel.simulation import TraCISimulation, AimsunKernelSimulation
 from flow.core.kernel.network import TraCIKernelNetwork, AimsunKernelNetwork
 from flow.core.kernel.vehicle import TraCIVehicle, AimsunKernelVehicle
+from flow.core.kernel.person import TraCIPerson
 from flow.core.kernel.traffic_light import TraCITrafficLight, \
     AimsunKernelTrafficLight
 from flow.utils.exceptions import FatalFlowError
 
 
-class Kernel(object):
+class Kernel(object): # TODO: add person
     """Kernel for abstract function calling across traffic simulator APIs.
 
     The kernel contains four different subclasses for distinguishing between
@@ -66,6 +67,7 @@ class Kernel(object):
             self.simulation = TraCISimulation(self)
             self.network = TraCIKernelNetwork(self, sim_params)
             self.vehicle = TraCIVehicle(self, sim_params)
+            self.person = TraCIPerson(self, sim_params)
             self.traffic_light = TraCITrafficLight(self)
         elif simulator == 'aimsun':
             self.simulation = AimsunKernelSimulation(self)
@@ -82,6 +84,7 @@ class Kernel(object):
         self.simulation.pass_api(kernel_api)
         self.network.pass_api(kernel_api)
         self.vehicle.pass_api(kernel_api)
+        self.person.pass_api(kernel_api)
         self.traffic_light.pass_api(kernel_api)
 
     def update(self, reset):
@@ -99,6 +102,7 @@ class Kernel(object):
             step
         """
         self.vehicle.update(reset)
+        self.person.update(reset)
         self.traffic_light.update(reset)
         self.network.update(reset)
         self.simulation.update(reset)

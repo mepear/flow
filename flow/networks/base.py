@@ -1,7 +1,7 @@
 """Contains the base network class."""
 
 from flow.core.params import InitialConfig
-from flow.core.params import TrafficLightParams
+from flow.core.params import PersonParams, TrafficLightParams
 from flow.core.params import SumoCarFollowingParams
 from flow.core.params import SumoLaneChangeParams
 import time
@@ -77,6 +77,9 @@ class Network(object):
     vehicles : flow.core.params.VehicleParams
         vehicle specific parameters, used to specify the types and number of
         vehicles at the start of a simulation
+    persons : flow.core.params.PersonParams
+        person specific parameters, used to specify the types and number of
+        persons at the start of a simulation, default None to keep compatibility
     net_params : flow.core.params.NetParams
         network specific parameters, used primarily to identify properties of a
         network such as the lengths of edges and the number of lanes in each
@@ -310,6 +313,7 @@ class Network(object):
                  name,
                  vehicles,
                  net_params,
+                 persons=PersonParams(),
                  initial_config=InitialConfig(),
                  traffic_lights=TrafficLightParams()):
         """Instantiate the base network class.
@@ -322,6 +326,8 @@ class Network(object):
             see flow/core/params.py
         net_params : flow.core.params.NetParams
             see flow/core/params.py
+        persons : flow.core.params.PersonParams
+            see flow/core/params.py
         initial_config : flow.core.params.InitialConfig
             see flow/core/params.py
         traffic_lights : flow.core.params.TrafficLightParams
@@ -331,6 +337,7 @@ class Network(object):
         self.name = name + time.strftime('_%Y%m%d-%H%M%S') + str(time.time())
 
         self.vehicles = vehicles
+        self.persons = persons
         self.net_params = net_params
         self.initial_config = initial_config
         self.traffic_lights = traffic_lights
@@ -535,7 +542,7 @@ class Network(object):
         return None
 
     # TODO: convert to property
-    def specify_routes(self, net_params):
+    def specify_routes(self, net_params): # TODO: may need to change
         """Specify the routes vehicles can take starting from any edge.
 
         Routes can be specified in one of three ways:

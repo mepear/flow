@@ -40,6 +40,8 @@ def make_create_env(params, version=0, render=None):
            the network's documentation or ADDITIONAL_NET_PARAMS component)
          - veh: vehicles to be placed in the network at the start of a rollout
            (see flow.core.params.VehicleParams)
+         - per: persons to be placed in the network at the start of a rollout
+           (see flow.core.params.PersonParams)
          - initial (optional): parameters affecting the positioning of vehicles
            upon initialization/reset (see flow.core.params.InitialConfig)
          - tls (optional): traffic lights to be introduced to specific nodes
@@ -58,6 +60,9 @@ def make_create_env(params, version=0, render=None):
     str
         name of the created gym environment
     """
+
+    print('We are in registry_with_person now.')  # TEST: this info should be printed if experiment uses this function
+
     exp_tag = params["exp_tag"]
 
     if isinstance(params["env_name"], str):
@@ -90,10 +95,13 @@ def make_create_env(params, version=0, render=None):
     def create_env(*_):
         sim_params = deepcopy(params['sim'])
         vehicles = deepcopy(params['veh'])
+        print(params['per'])
+        persons = deepcopy(params['per'])
 
         network = network_class(
             name=exp_tag,
             vehicles=vehicles,
+            persons=persons,
             net_params=net_params,
             initial_config=initial_config,
             traffic_lights=traffic_lights,

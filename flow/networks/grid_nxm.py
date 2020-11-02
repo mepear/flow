@@ -2,7 +2,7 @@
 
 from flow.networks.base import Network
 from flow.core.params import InitialConfig
-from flow.core.params import TrafficLightParams
+from flow.core.params import TrafficLightParams, PersonParams
 from collections import defaultdict
 import numpy as np
 
@@ -82,6 +82,7 @@ class GridnxmNetwork(Network):
                  name,
                  vehicles,
                  net_params,
+                 persons=PersonParams(),
                  initial_config=InitialConfig(),
                  traffic_lights=TrafficLightParams()):
         """Initialize an n*m traffic light grid network."""
@@ -127,7 +128,7 @@ class GridnxmNetwork(Network):
         # name of the network (DO NOT CHANGE)
         self.name = "BobLoblawsLawBlog"
 
-        super().__init__(name, vehicles, net_params, initial_config,
+        super().__init__(name, vehicles, net_params, persons, initial_config,
                          traffic_lights)
 
     def specify_nodes(self, net_params):
