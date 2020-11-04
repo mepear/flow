@@ -513,7 +513,9 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
             [
                 'netconvert -c ' + self.net_path + self.cfgfn +
                 ' --output-file=' + self.cfg_path + self.netfn +
-                ' --no-internal-links="false"'
+                ' --no-internal-links="false"' +
+                ' --no-turnarounds.fringe="false"' +
+                ' --no-turnarounds="false"'
             ],
             stdout=subprocess.DEVNULL,
             shell=True)

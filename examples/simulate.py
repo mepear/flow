@@ -7,6 +7,7 @@ import argparse
 import sys
 import json
 import os
+import numpy as np
 from flow.core.experiment import Experiment
 
 from flow.core.params import AimsunParams
@@ -53,6 +54,42 @@ def parse_args(args):
     return parser.parse_known_args(args)[0]
 
 
+def add_request(env):
+    if np.random.rand() < 0.005:
+        person_ids = [int(per_id[4:]) for per_id in env.k.person.get_ids()]
+        idx = max(person_ids) + 1 if len(person_ids) > 0 else 1
+        edge_list = env.k.network.get_edge_list()
+        edge_id1 = np.random.choice(edge_list)
+        edge_id2 = np.random.choice(edge_list)
+        per_id = 'per_' + str(idx)
+        env.k.person.kernel_api.person.add(per_id, edge_id1, 2)
+        env.k.person.kernel_api.person.appendDrivingStage(per_id, edge_id2, 'taxi')
+        env.k.person.kernel_api.person.setColor(per_id, (255, 0, 0))
+        
+        print('add_request', per_id)
+
+def dispatch_taxi(env):
+#    if np.random.rand() < 0.001:
+#        route_list = env.network.routes
+#        route_id = list(route_list.keys())[0]
+#        idx = 'taxi' + '{:.4f}'.format(np.random.rand())
+#        env.k.vehicle.kernel_api.vehicle.add(idx, route_id, typeID='taxi')
+#        print('add_taxi', idx)
+    reservations = env.k.person.get_reservations()
+    if 'taxi_0' not in env.k.vehicle.get_ids():
+        edge_list = env.k.network.get_edge_list()
+        edge = np.random.choice(edge_list)
+        num_routes = len(env.k.vehicle.master_kernel.network.rts[edge])
+        frac = [val[1] for val in env.k.vehicle.master_kernel.network.rts[edge]]
+        route_id = 'route{}_{}'.format(edge, np.random.choice(
+                [i for i in range(num_routes)], size=1, p=frac)[0])
+        # env.k.vehicle.add('taxi_0', 'taxi', edge_id, 0, 0, 0)
+        env.k.vehicle.kernel_api.vehicle.add('taxi_0', route_id, typeID='taxi')
+    empty_taxi_fleet = env.k.vehicle.get_taxi_fleet(0)
+    for taxi, res in zip(empty_taxi_fleet, reservations):
+        print('dispatch_taxi', taxi, res.persons[0])
+        env.k.vehicle.dispatch_taxi(taxi, res.id)
+
 if __name__ == "__main__":
     flags = parse_args(sys.argv[1:])
 
@@ -64,7 +101,9 @@ if __name__ == "__main__":
     if hasattr(getattr(module, flags.exp_config), "custom_callables"):
         callables = getattr(module, flags.exp_config).custom_callables
     else:
-        callables = None
+        callables = {}
+        callables['add_request'] = add_request
+        callables['dispatch_taxi'] = dispatch_taxi
 
     flow_params['sim'].render = not flags.no_render
     flow_params['simulator'] = 'aimsun' if flags.aimsun else 'traci'
