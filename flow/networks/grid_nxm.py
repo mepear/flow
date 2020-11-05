@@ -122,9 +122,9 @@ class GridnxmNetwork(Network):
             "traffic_lights", False)
 
         # radius of the inner nodes (ie of the intersections)
-        self.inner_nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
-                                                  self.horizontal_lanes)
-        # self.inner_nodes_radius = 0
+        # self.inner_nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
+        #                                           self.horizontal_lanes)
+        self.inner_nodes_radius = 0
 
         # total number of edges in the network
         self.num_edges = 4 * ((self.col_num + 1) * self.row_num + self.col_num)
@@ -171,7 +171,7 @@ class GridnxmNetwork(Network):
                     "x": col * self.inner_length,
                     "y": row * self.inner_length,
                     "type": node_type,
-                    "radius": self.inner_nodes_radius
+                    # "radius": self.inner_nodes_radius
                 })
 
         inserted_nodes = []
@@ -329,16 +329,27 @@ class GridnxmNetwork(Network):
         """
         con_dict = {}
 
-        def new_con(side, from_id, to_id, lane, signal_group, toside=None, from_sub_id=0, to_sub_id=0):
+        def new_con(side, from_id, to_id, signal_group, toside=None, from_sub_id=0, to_sub_id=0):
             if toside is None:
                 toside = side
-            conn = [{
-                "from": side + from_id + "_{}".format(from_sub_id),
-                "to": toside + to_id + "_{}".format(to_sub_id)
-                # "fromLane": str(lane),
-                # "toLane": str(lane),
-                # "signal_group": signal_group
-            }]
+            
+            conn = []
+            for lane1 in range(self.vertical_lanes):
+                for lane2 in range(self.vertical_lanes):
+                    conn.append({
+                    "from": side + from_id + "_{}".format(from_sub_id),
+                    "to": toside + to_id + "_{}".format(to_sub_id),
+                    "fromLane": str(lane1),
+                    "toLane": str(lane2),                        
+                    })
+                
+            # conn = [{
+            #     "from": side + from_id + "_{}".format(from_sub_id),
+            #     "to": toside + to_id + "_{}".format(to_sub_id)
+            #     # "fromLane": str(lane),
+            #     # "toLane": str(lane),
+            #     # "signal_group": signal_group
+            # }]
             # if conn[0]['signal_group'] is None:
             #     del conn[0]['signal_group']
             return conn
@@ -355,51 +366,41 @@ class GridnxmNetwork(Network):
             right_edge_id = "{}_{}".format(i, j+1) if j + 1 < self.col_num else None
             assert self.vertical_lanes == self.horizontal_lanes
             if right_edge_id is not None and top_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('top', right_edge_id, top_edge_id, lane, None, 'right', 0, 0)
-                    conn += new_con('left', top_edge_id, right_edge_id, lane, None, 'bot', 0, 0)
+                conn += new_con('top', right_edge_id, top_edge_id, None, 'right', 0, 0)
+                conn += new_con('left', top_edge_id, right_edge_id, None, 'bot', 0, 0)
             if top_edge_id is not None and left_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('left', top_edge_id, left_edge_id, lane, None, 'top', 0, self.sub_edge_num-1)
-                    conn += new_con('bot', left_edge_id, top_edge_id, lane, None, 'right', self.sub_edge_num-1, 0)
+                conn += new_con('left', top_edge_id, left_edge_id, None, 'top', 0, self.sub_edge_num-1)
+                conn += new_con('bot', left_edge_id, top_edge_id, None, 'right', self.sub_edge_num-1, 0)
             if bot_edge_id is not None and right_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('right', bot_edge_id, right_edge_id, lane, None, "bot", self.sub_edge_num-1, 0)
-                    conn += new_con('top', right_edge_id, bot_edge_id, lane, None, "left", 0, self.sub_edge_num-1)
+                conn += new_con('right', bot_edge_id, right_edge_id, None, "bot", self.sub_edge_num-1, 0)
+                conn += new_con('top', right_edge_id, bot_edge_id, None, "left", 0, self.sub_edge_num-1)
             if bot_edge_id is not None and left_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('right', bot_edge_id, left_edge_id, lane, None, "top", self.sub_edge_num-1, self.sub_edge_num-1)
-                    conn += new_con('bot', left_edge_id, bot_edge_id, lane, None, "left", self.sub_edge_num-1, self.sub_edge_num-1)
+                conn += new_con('right', bot_edge_id, left_edge_id, None, "top", self.sub_edge_num-1, self.sub_edge_num-1)
+                conn += new_con('bot', left_edge_id, bot_edge_id, None, "left", self.sub_edge_num-1, self.sub_edge_num-1)
 
             if top_edge_id is not None and bot_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('right', bot_edge_id, top_edge_id, lane, 2)
-                    conn += new_con('left', top_edge_id, bot_edge_id, lane, 2)
+                conn += new_con('right', bot_edge_id, top_edge_id, 2)
+                conn += new_con('left', top_edge_id, bot_edge_id, 2)
             if left_edge_id is not None and right_edge_id is not None:
-                for lane in range(self.horizontal_lanes):
-                    conn += new_con('bot', left_edge_id, right_edge_id, lane, 1)
-                    conn += new_con('top', right_edge_id, left_edge_id, lane, 1)
+                conn += new_con('bot', left_edge_id, right_edge_id, 1)
+                conn += new_con('top', right_edge_id, left_edge_id, 1)
 
             if top_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('left', top_edge_id, top_edge_id, lane, None, 'right', 0, 0)
-                    for n in range(self.sub_edge_num - 1):
-                        conn += new_con('left', top_edge_id, top_edge_id, lane, None, 'left', n+1, n)
+                conn += new_con('left', top_edge_id, top_edge_id, None, 'right', 0, 0)
+                for n in range(self.sub_edge_num - 1):
+                    conn += new_con('left', top_edge_id, top_edge_id, None, 'left', n+1, n)
             if bot_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('right', bot_edge_id, bot_edge_id, lane, None, 'left', self.sub_edge_num-1, self.sub_edge_num-1)
-                    for n in range(self.sub_edge_num-1):
-                        conn += new_con('right', bot_edge_id, bot_edge_id, lane, None, 'right', n, n+1)
+                conn += new_con('right', bot_edge_id, bot_edge_id, None, 'left', self.sub_edge_num-1, self.sub_edge_num-1)
+                for n in range(self.sub_edge_num-1):
+                    conn += new_con('right', bot_edge_id, bot_edge_id, None, 'right', n, n+1)
             if left_edge_id is not None:
-                for lane in range(self.horizontal_lanes):
-                    conn += new_con('bot', left_edge_id, left_edge_id, lane, None, 'top', self.sub_edge_num-1, self.sub_edge_num-1)
-                    for n in range(self.sub_edge_num-1):
-                        conn += new_con('bot', left_edge_id, left_edge_id, lane, None, 'bot', n, n+1)
+                conn += new_con('bot', left_edge_id, left_edge_id, None, 'top', self.sub_edge_num-1, self.sub_edge_num-1)
+                for n in range(self.sub_edge_num-1):
+                    conn += new_con('bot', left_edge_id, left_edge_id, None, 'bot', n, n+1)
             if right_edge_id is not None:
-                for lane in range(self.horizontal_lanes):
-                    conn += new_con('top', right_edge_id, right_edge_id, lane, None, 'bot', 0, 0)
-                    for n in range(self.sub_edge_num-1):
-                        conn += new_con('top', right_edge_id, right_edge_id, lane, None, 'top', n+1, n)
+                conn += new_con('top', right_edge_id, right_edge_id, None, 'bot', 0, 0)
+                for n in range(self.sub_edge_num-1):
+                    conn += new_con('top', right_edge_id, right_edge_id, None, 'top', n+1, n)
 
             node_id = "center{}".format(node_id)
             con_dict[node_id] = conn

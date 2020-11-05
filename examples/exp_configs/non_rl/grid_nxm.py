@@ -13,14 +13,14 @@ USE_INFLOWS = False
 
 v_enter = 10
 inner_length = 50
-n_rows = 3
-n_columns = 3
+n_rows = 4
+n_columns = 4
 
 grid_array = {
     "inner_length": inner_length,
     "row_num": n_rows,
     "col_num": n_columns,
-    "sub_edge_num": 2
+    "sub_edge_num": 1
 }
 
 
@@ -132,19 +132,19 @@ vehicles = VehicleParams()
 #         decel=7.5,  # avoid collisions at emergency stops
 #     ),
 #     num_vehicles=tot_cars)
-# vehicles.add(
-#     veh_id="idm",
-#     acceleration_controller=(IDMController, {}),
-#     routing_controller=(MinicityRouter, {}),
-#     car_following_params=SumoCarFollowingParams(
-#         min_gap=2.5,
-#         decel=7.5,  # avoid collisions at emergency stops
-#     ),
-#     lane_change_params=SumoLaneChangeParams(
-#         lane_change_mode="no_lc_safe",
-#     ),
-#     initial_speed=0,
-#     num_vehicles=0)
+vehicles.add(
+    veh_id="idm",
+    acceleration_controller=(IDMController, {}),
+    routing_controller=(MinicityRouter, {}),
+    car_following_params=SumoCarFollowingParams(
+        min_gap=2.5,
+        decel=7.5,  # avoid collisions at emergency stops
+    ),
+    lane_change_params=SumoLaneChangeParams(
+        lane_change_mode="no_lc_safe",
+    ),
+    initial_speed=0,
+    num_vehicles=0)
 # vehicles.add(
 #     veh_id="rl",
 #     acceleration_controller=(RLController, {}),
@@ -153,15 +153,15 @@ vehicles = VehicleParams()
 #         speed_mode="obey_safe_speed",
 #     ),
 #     initial_speed=0,
-#     num_vehicles=20)
+#     num_vehicles=5)
 vehicles.add(
     veh_id="taxi",
-    initial_speed=0,
+    initial_speed=1,
     # acceleration_controller=(IDMController, {}),
     # lane_change_params=SumoLaneChangeParams(
     #     lane_change_mode="no_lc_safe",
     # ),
-    num_vehicles=1,
+    num_vehicles=5,
     is_taxi=True)
 
 env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
@@ -195,8 +195,8 @@ tl_logic.add("center2", phases=phases, programID=1, tls_type="actuated")
 additional_net_params = {
     "grid_array": grid_array,
     "speed_limit": 35,
-    "horizontal_lanes": 1,
-    "vertical_lanes": 1
+    "horizontal_lanes": 2,
+    "vertical_lanes": 2
 }
 
 if USE_INFLOWS:
