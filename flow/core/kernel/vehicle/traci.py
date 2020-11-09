@@ -1193,5 +1193,26 @@ class TraCIVehicle(KernelVehicle):
         # TODO : Brent
         return 0
 
-    def dispatch_taxi(self, veh_id, reservation_id):
-        self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation_id])
+    def dispatch_taxi(self, veh_id, reservation):
+        # cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
+        # if cur_edge.startswith(':'):
+        #     return
+        #TODO : if rerouting is needed?
+
+        # from_edge = reservation.fromEdge
+        # route = self.kernel_api.simulation.findRoute(cur_edge, from_edge)
+        # self.kernel_api.vehicle.setRoute(veh_id, route.edges)
+        self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation.id])
+    
+    def reposition_taxi(self, veh_id, position_x, position_y):
+        try:
+            edge_id, pos, lane = self.kernel_api.simulation.convertRoad(position_x, position_y)
+            if edge_id.startswith(':') or edge_id == self.kernel_api.vehicle.getRoadID(veh_id):
+                return
+            self.kernel_api.vehicle.resume(veh_id)
+            self.kernel_api.vehicle.changeTarget(veh_id, edge_id)
+            self.kernel_api.vehicle.setStop(veh_id, edge_id, pos, 0)
+        #TODO: for debug
+        except TraCIException as e:
+            print(e)
+            print(self.kernel_api.vehicle.getLaneID(veh_id), edge_id)

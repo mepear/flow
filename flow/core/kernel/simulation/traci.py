@@ -203,8 +203,8 @@ class TraCISimulation(KernelSimulation): # TODO: add person & update kernel api
                 sumo_call.append('--persontrip.transfer.car-walk')
                 sumo_call.append('allJunctions')
                 
-                sumo_call.append('--device.taxi.idle-algorithm')
-                sumo_call.append('randomCircling')
+                # sumo_call.append('--device.taxi.idle-algorithm')
+                # sumo_call.append('randomCircling')
 
                 # use a ballistic integration step (if request)
                 if sim_params.use_ballistic:

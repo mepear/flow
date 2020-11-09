@@ -70,17 +70,34 @@ def add_request(env):
         print('add_request', per_id, 'from', str(edge_id1), 'to', str(edge_id2))
 
 def dispatch_taxi(env):
-#    if np.random.rand() < 0.001:
-#        route_list = env.network.routes
-#        route_id = list(route_list.keys())[0]
-#        idx = 'taxi' + '{:.4f}'.format(np.random.rand())
-#        env.k.vehicle.kernel_api.vehicle.add(idx, route_id, typeID='taxi')
-#        print('add_taxi', idx)
+
     reservations = env.k.person.get_reservations()
-    empty_taxi_fleet = env.k.vehicle.get_taxi_fleet(0)
+    empty_taxi_fleet_tmp = env.k.vehicle.get_taxi_fleet(0)
+    # there would be some problems if the a taxi is on the road started with ":". 
+    empty_taxi_fleet = [taxi for taxi in empty_taxi_fleet_tmp if not env.k.vehicle.kernel_api.vehicle.getRoadID(taxi).startswith(':')]
     for taxi, res in zip(empty_taxi_fleet, reservations):
         print('dispatch_taxi', taxi, res.persons[0])
-        env.k.vehicle.dispatch_taxi(taxi, res.id)
+        env.k.vehicle.dispatch_taxi(taxi, res)
+
+def reposition_taxi(env):
+    reservations = env.k.person.get_reservations()
+    empty_taxi_fleet = env.k.vehicle.get_taxi_fleet(0)
+    if empty_taxi_fleet and not reservations:
+        for taxi in empty_taxi_fleet:
+            if env.k.vehicle.kernel_api.vehicle.isStopped(taxi):
+                x = np.random.uniform(0, 100)
+                y = np.random.uniform(0, 100)
+                print('reposition {} to ({}, {})'.format(taxi, x, y))
+                env.k.vehicle.reposition_taxi(taxi, x, y)
+
+def check_taxi_route(env):
+    for veh_id in env.k.vehicle.get_ids():
+        if env.k.vehicle.kernel_api.vehicle.getTypeID(veh_id) == 'taxi':
+            is_route_valid = env.k.vehicle.kernel_api.vehicle.isRouteValid(veh_id)
+            if not is_route_valid:
+                print(env.k.vehicle.kernel_api.vehicle.getRoute(veh_id))
+                # if the route is not valid, we need to reset the route
+                env.k.vehicle.kernel_api.vehicle.rerouteTraveltime(veh_id)
 
 if __name__ == "__main__":
     flags = parse_args(sys.argv[1:])
@@ -96,6 +113,8 @@ if __name__ == "__main__":
         callables = {}
         callables['add_request'] = add_request
         callables['dispatch_taxi'] = dispatch_taxi
+        callables['reposition_taxi'] = reposition_taxi
+        callables['check_taxi_route'] = check_taxi_route
 
     flow_params['sim'].render = not flags.no_render
     flow_params['simulator'] = 'aimsun' if flags.aimsun else 'traci'
