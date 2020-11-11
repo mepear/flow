@@ -193,7 +193,7 @@ class KernelVehicle(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def dispatchTaxi(self, veh_id, reservation_id):
+    def dispatch_taxi(self, veh_id, reservation_id):
         """Dispath vehicle of veh_id to reservation id"""
         pass
 

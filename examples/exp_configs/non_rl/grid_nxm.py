@@ -12,7 +12,7 @@ from flow.networks import GridnxmNetwork
 USE_INFLOWS = False
 
 v_enter = 10
-inner_length = 300
+inner_length = 50
 n_rows = 4
 n_columns = 4
 
@@ -143,29 +143,20 @@ vehicles.add(
         lane_change_mode="no_lc_safe",
     ),
     initial_speed=0,
-    num_vehicles=300)
-vehicles.add(
-    veh_id="rl",
-    acceleration_controller=(RLController, {}),
-    routing_controller=(MinicityRouter, {}),
-    car_following_params=SumoCarFollowingParams(
-        speed_mode="obey_safe_speed",
-    ),
-    initial_speed=0,
-    num_vehicles=20)
+    num_vehicles=0)
+# vehicles.add(
+#     veh_id="rl",
+#     acceleration_controller=(RLController, {}),
+#     routing_controller=(MinicityRouter, {}),
+#     car_following_params=SumoCarFollowingParams(
+#         speed_mode="obey_safe_speed",
+#     ),
+#     initial_speed=0,
+#     num_vehicles=20)
 vehicles.add(
     veh_id="taxi",
-    acceleration_controller=(IDMController, {}),
-    routing_controller=(MinicityRouter, {}),
-    car_following_params=SumoCarFollowingParams(
-        min_gap=2.5,
-        decel=7.5,  # avoid collisions at emergency stops
-    ),
-    lane_change_params=SumoLaneChangeParams(
-        lane_change_mode="no_lc_safe",
-    ),
     initial_speed=0,
-    num_vehicles=1,
+    num_vehicles=10,
     is_taxi=True)
 
 env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)

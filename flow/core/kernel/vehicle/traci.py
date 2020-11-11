@@ -1067,6 +1067,17 @@ class TraCIVehicle(KernelVehicle):
             except (FatalTraCIError, TraCIException) as e:
                 print('Error when updating human vehicle colors:', e)
 
+        for veh_id in self.get_ids():
+            try:
+                if 'taxi' in veh_id:
+                    color = GREEN
+                    # If vehicle is already being colored via argument to vehicles.add(), don't re-color it.
+                    if self._force_color_update or 'color' not in \
+                            self.type_parameters[self.get_type(veh_id)]:
+                        self.set_color(veh_id=veh_id, color=color)
+            except (FatalTraCIError, TraCIException) as e:
+                print('Error when updating human vehicle colors:', e)
+
         # color vehicles by speed if desired
         if self._color_by_speed:
             max_speed = self.master_kernel.network.max_speed()
@@ -1119,6 +1130,9 @@ class TraCIVehicle(KernelVehicle):
             departLane=str(lane),
             departPos=str(pos),
             departSpeed=str(speed))
+
+    def get_taxi_fleet(self, flag):
+        return self.kernel_api.vehicle.getTaxiFleet(flag)
 
     def get_max_speed(self, veh_id, error=-1001):
         """See parent class."""
@@ -1179,5 +1193,5 @@ class TraCIVehicle(KernelVehicle):
         # TODO : Brent
         return 0
 
-    def dispatchTaxi(self, veh_id, reservation_id):
+    def dispatch_taxi(self, veh_id, reservation_id):
         self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation_id])
