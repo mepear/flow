@@ -20,6 +20,7 @@ grid_array = {
     "inner_length": inner_length,
     "row_num": n_rows,
     "col_num": n_columns,
+    "sub_edge_num": 1
 }
 
 
@@ -152,11 +153,15 @@ vehicles.add(
 #         speed_mode="obey_safe_speed",
 #     ),
 #     initial_speed=0,
-#     num_vehicles=20)
+#     num_vehicles=5)
 vehicles.add(
     veh_id="taxi",
-    initial_speed=0,
-    num_vehicles=10,
+    initial_speed=1,
+    # acceleration_controller=(IDMController, {}),
+    # lane_change_params=SumoLaneChangeParams(
+    #     lane_change_mode="no_lc_safe",
+    # ),
+    num_vehicles=5,
     is_taxi=True)
 
 env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
@@ -222,6 +227,7 @@ flow_params = dict(
     sim=SumoParams(
         sim_step=0.1,
         render=True,
+        # taxi_dispatch_alg="greedy"
     ),
 
     # environment related parameters (see flow.core.params.EnvParams)
@@ -245,5 +251,5 @@ flow_params = dict(
 
     # traffic lights to be introduced to specific nodes (see
     # flow.core.params.TrafficLightParams)
-    tls=tl_logic,
+    # tls=tl_logic,
 )

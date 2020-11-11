@@ -197,6 +197,11 @@ class KernelVehicle(object, metaclass=ABCMeta):
         """Dispath vehicle of veh_id to reservation id"""
         pass
 
+    @abstractmethod
+    def reposition_taxi(self, veh_id, position_x, position_y):
+        """Repostion a taxi when it arrives"""
+        pass
+
     ###########################################################################
     # Methods to visually distinguish vehicles by {RL, observed, unobserved}  #
     ###########################################################################

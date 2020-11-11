@@ -513,7 +513,11 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
             [
                 'netconvert -c ' + self.net_path + self.cfgfn +
                 ' --output-file=' + self.cfg_path + self.netfn +
-                ' --no-internal-links="false"'
+                ' --no-internal-links="false"' +
+                ' --no-turnarounds.fringe="false"' +
+                ' --no-turnarounds="false"' +
+                ' --sidewalks.guess="true"' +
+                ' --default.junctions.radius=0'
             ],
             stdout=subprocess.DEVNULL,
             shell=True)
@@ -653,6 +657,11 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
                 key: str(params['type_params'][key])
                 for key in params['type_params']
             }
+            #TODO find out appropriate parameters
+            if params['taxi']:
+                type_params_str = {
+                    'vClass': 'taxi',
+                }
             e = E('vType', id=params['veh_id'], **type_params_str)
             if params['taxi']:
                 e.append(E('param', key='has.taxi.device', value='true'))

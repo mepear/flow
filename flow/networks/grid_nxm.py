@@ -15,6 +15,8 @@ ADDITIONAL_NET_PARAMS = {
         "col_num": 3,
         # length of inner edges in the traffic light grid network
         "inner_length": None,
+        # split a edge to several sub-edges, the number of sub-edges
+        "sub_edge_num": 1,
     },
     # number of lanes in the horizontal edges
     "horizontal_lanes": 1,
@@ -112,15 +114,17 @@ class GridnxmNetwork(Network):
         self.row_num = self.grid_array["row_num"]
         self.col_num = self.grid_array["col_num"]
         self.inner_length = self.grid_array["inner_length"]
+        self.sub_edge_num = self.grid_array["sub_edge_num"]
 
         # specifies whether or not there will be traffic lights at the
         # intersections (True by default)
         self.use_traffic_lights = net_params.additional_params.get(
-            "traffic_lights", True)
+            "traffic_lights", False)
 
         # radius of the inner nodes (ie of the intersections)
-        self.inner_nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
-                                                  self.horizontal_lanes)
+        # self.inner_nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
+        #                                           self.horizontal_lanes)
+        self.inner_nodes_radius = 0
 
         # total number of edges in the network
         self.num_edges = 4 * ((self.col_num + 1) * self.row_num + self.col_num)
@@ -159,6 +163,7 @@ class GridnxmNetwork(Network):
         node_type = "traffic_light" if self.use_traffic_lights else "priority"
 
         nodes = []
+        inserted_nodes = []
         for row in range(self.row_num):
             for col in range(self.col_num):
                 nodes.append({
@@ -166,10 +171,32 @@ class GridnxmNetwork(Network):
                     "x": col * self.inner_length,
                     "y": row * self.inner_length,
                     "type": node_type,
-                    "radius": self.inner_nodes_radius
+                    # "radius": self.inner_nodes_radius
                 })
 
-        return nodes
+        inserted_nodes = []
+        for row in range(self.row_num):
+            for col in range(self.col_num):
+                for n in range(self.sub_edge_num - 1):
+                    cur_id = row * self.col_num + col
+                    
+                    if col < self.col_num - 1:
+                        inserted_nodes.append({
+                            "id": "{}-{}_{}".format(cur_id, cur_id + 1, n),
+                            "x": col * self.inner_length + self.inner_length * (n + 1) / self.sub_edge_num,
+                            "y": row * self.inner_length,
+                            "type": "priority"
+                        })
+                    if row < self.row_num - 1:
+                        inserted_nodes.append({
+                            "id": "{}-{}_{}".format(cur_id, cur_id + self.col_num, n),
+                            "x": col * self.inner_length,
+                            "y": row * self.inner_length + self.inner_length * (n + 1) / self.sub_edge_num,
+                            "type": "priority"
+                        })
+
+
+        return nodes + inserted_nodes
 
     def specify_edges(self, net_params):
         """Build out the inner edges of the network.
@@ -211,15 +238,25 @@ class GridnxmNetwork(Network):
         edges = []
 
         def new_edge(index, from_node, to_node, orientation, lane):
-            return [{
-                "id": lane + index,
-                "type": orientation,
-                "priority": 78,
-                "from": "center" + str(from_node),
-                "to": "center" + str(to_node),
-                "length": self.inner_length
-            }]
+            assert from_node != to_node
+            if from_node < to_node:
+                node_list = ["center{}".format(from_node)] + ["{}-{}_{}".format(from_node, to_node, n) for n in range(self.sub_edge_num - 1)] + ["center{}".format(to_node)]
+            else: 
+                node_list = ["center{}".format(from_node)] + ["{}-{}_{}".format(to_node, from_node, n) for n in range(self.sub_edge_num - 2, -1, -1)] + ["center{}".format(to_node)]
 
+            new_edges = []
+            for i, node in enumerate(node_list):
+                if i + 1 < len(node_list):
+                    new_edges.append({
+                        "id": "{}{}_{}".format(lane, index, i),
+                        "type": orientation,
+                        "priority": 78,
+                        "from": node,
+                        "to": node_list[i + 1],
+                        "length": self.inner_length / self.sub_edge_num
+                    })
+            return new_edges
+        
         # Build the horizontal inner edges
         for i in range(self.row_num):
             for j in range(self.col_num - 1):
@@ -245,6 +282,21 @@ class GridnxmNetwork(Network):
     def specify_routes(self, net_params):
         """See parent class."""
         routes = {}
+        # conn = self.specify_connections(net_params)
+        # for node_id in range(self.row_num * self.col_num):
+        #     node_conn = conn['center{}'.format(node_id)]
+        #     for c in node_conn:
+        #         from_edge = c['from']
+        #         target_edge = c['to']
+        #         if from_edge not in routes:
+        #             routes[from_edge] = []
+        #         routes[from_edge].append([[from_edge, target_edge], 1])
+        # for r in routes:
+        #     l = len(routes[r])
+        #     for i, route in enumerate(routes[r]):
+        #         route[1] = 1. / l
+        #         routes[r][i] = tuple(route)
+                
         edges = self.specify_edges(net_params)
         for edge in edges:
             routes[edge['id']] = [edge['id']]
@@ -277,18 +329,29 @@ class GridnxmNetwork(Network):
         """
         con_dict = {}
 
-        def new_con(side, from_id, to_id, lane, signal_group, toside=None):
+        def new_con(side, from_id, to_id, signal_group, toside=None, from_sub_id=0, to_sub_id=0):
             if toside is None:
                 toside = side
-            conn = [{
-                "from": side + from_id,
-                "to": toside + to_id,
-                "fromLane": str(lane),
-                "toLane": str(lane),
-                "signal_group": signal_group
-            }]
-            if conn[0]['signal_group'] is None:
-                del conn[0]['signal_group']
+            
+            conn = []
+            for lane1 in range(self.vertical_lanes):
+                for lane2 in range(self.vertical_lanes):
+                    conn.append({
+                    "from": side + from_id + "_{}".format(from_sub_id),
+                    "to": toside + to_id + "_{}".format(to_sub_id),
+                    "fromLane": str(lane1),
+                    "toLane": str(lane2),                        
+                    })
+                
+            # conn = [{
+            #     "from": side + from_id + "_{}".format(from_sub_id),
+            #     "to": toside + to_id + "_{}".format(to_sub_id)
+            #     # "fromLane": str(lane),
+            #     # "toLane": str(lane),
+            #     # "signal_group": signal_group
+            # }]
+            # if conn[0]['signal_group'] is None:
+            #     del conn[0]['signal_group']
             return conn
 
         # build connections at each inner node
@@ -303,30 +366,41 @@ class GridnxmNetwork(Network):
             right_edge_id = "{}_{}".format(i, j+1) if j + 1 < self.col_num else None
             assert self.vertical_lanes == self.horizontal_lanes
             if right_edge_id is not None and top_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('top', right_edge_id, top_edge_id, lane, None, 'right')
-                    conn += new_con('left', top_edge_id, right_edge_id, lane, None, 'bot')
+                conn += new_con('top', right_edge_id, top_edge_id, None, 'right', 0, 0)
+                conn += new_con('left', top_edge_id, right_edge_id, None, 'bot', 0, 0)
             if top_edge_id is not None and left_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('left', top_edge_id, left_edge_id, lane, None, 'top')
-                    conn += new_con('bot', left_edge_id, top_edge_id, lane, None, 'right')
+                conn += new_con('left', top_edge_id, left_edge_id, None, 'top', 0, self.sub_edge_num-1)
+                conn += new_con('bot', left_edge_id, top_edge_id, None, 'right', self.sub_edge_num-1, 0)
             if bot_edge_id is not None and right_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('right', bot_edge_id, right_edge_id, lane, None, "bot")
-                    conn += new_con('top', right_edge_id, bot_edge_id, lane, None, "left")
+                conn += new_con('right', bot_edge_id, right_edge_id, None, "bot", self.sub_edge_num-1, 0)
+                conn += new_con('top', right_edge_id, bot_edge_id, None, "left", 0, self.sub_edge_num-1)
             if bot_edge_id is not None and left_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('right', bot_edge_id, left_edge_id, lane, None, "top")
-                    conn += new_con('bot', left_edge_id, bot_edge_id, lane, None, "left")
+                conn += new_con('right', bot_edge_id, left_edge_id, None, "top", self.sub_edge_num-1, self.sub_edge_num-1)
+                conn += new_con('bot', left_edge_id, bot_edge_id, None, "left", self.sub_edge_num-1, self.sub_edge_num-1)
 
             if top_edge_id is not None and bot_edge_id is not None:
-                for lane in range(self.vertical_lanes):
-                    conn += new_con('right', bot_edge_id, top_edge_id, lane, 2)
-                    conn += new_con('left', top_edge_id, bot_edge_id, lane, 2)
+                conn += new_con('right', bot_edge_id, top_edge_id, 2)
+                conn += new_con('left', top_edge_id, bot_edge_id, 2)
             if left_edge_id is not None and right_edge_id is not None:
-                for lane in range(self.horizontal_lanes):
-                    conn += new_con('bot', left_edge_id, right_edge_id, lane, 1)
-                    conn += new_con('top', right_edge_id, left_edge_id, lane, 1)
+                conn += new_con('bot', left_edge_id, right_edge_id, 1)
+                conn += new_con('top', right_edge_id, left_edge_id, 1)
+
+            if top_edge_id is not None:
+                conn += new_con('left', top_edge_id, top_edge_id, None, 'right', 0, 0)
+                for n in range(self.sub_edge_num - 1):
+                    conn += new_con('left', top_edge_id, top_edge_id, None, 'left', n+1, n)
+            if bot_edge_id is not None:
+                conn += new_con('right', bot_edge_id, bot_edge_id, None, 'left', self.sub_edge_num-1, self.sub_edge_num-1)
+                for n in range(self.sub_edge_num-1):
+                    conn += new_con('right', bot_edge_id, bot_edge_id, None, 'right', n, n+1)
+            if left_edge_id is not None:
+                conn += new_con('bot', left_edge_id, left_edge_id, None, 'top', self.sub_edge_num-1, self.sub_edge_num-1)
+                for n in range(self.sub_edge_num-1):
+                    conn += new_con('bot', left_edge_id, left_edge_id, None, 'bot', n, n+1)
+            if right_edge_id is not None:
+                conn += new_con('top', right_edge_id, right_edge_id, None, 'bot', 0, 0)
+                for n in range(self.sub_edge_num-1):
+                    conn += new_con('top', right_edge_id, right_edge_id, None, 'top', n+1, n)
 
             node_id = "center{}".format(node_id)
             con_dict[node_id] = conn
