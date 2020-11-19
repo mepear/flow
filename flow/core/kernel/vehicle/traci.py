@@ -1193,10 +1193,6 @@ class TraCIVehicle(KernelVehicle):
         # TODO : Brent
         return 0
 
-<<<<<<< HEAD
-    def dispatch_taxi(self, veh_id, reservation_id):
-        self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation_id])
-=======
     def dispatch_taxi(self, veh_id, reservation):
         # cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
         # if cur_edge.startswith(':'):
@@ -1220,4 +1216,3 @@ class TraCIVehicle(KernelVehicle):
         except TraCIException as e:
             print(e)
             print(self.kernel_api.vehicle.getLaneID(veh_id), edge_id)
->>>>>>> 818e71b9ac34657cf857adaa18ee634da4ac81a4
