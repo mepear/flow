@@ -419,7 +419,7 @@ class Env(gym.Env, metaclass=ABCMeta):
                 (self.env_params.warmup_steps + self.env_params.horizon)
 
         # compute the info for each agent
-        infos = {}
+        infos = self._get_infos() if hasattr(self, '_get_infos') else {}
 
         # compute the reward
         if self.env_params.clip_actions:

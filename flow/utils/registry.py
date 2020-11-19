@@ -7,7 +7,7 @@ from copy import deepcopy
 
 import flow.envs
 from flow.core.params import InitialConfig
-from flow.core.params import TrafficLightParams
+from flow.core.params import TrafficLightParams, PersonParams
 
 
 def make_create_env(params, version=0, render=None):
@@ -95,8 +95,9 @@ def make_create_env(params, version=0, render=None):
     def create_env(*_):
         sim_params = deepcopy(params['sim'])
         vehicles = deepcopy(params['veh'])
-        print(params['per'])
-        persons = deepcopy(params['per'])
+        # print(params['per'])
+        persons = deepcopy(params.get('per', PersonParams()))
+
 
         network = network_class(
             name=exp_tag,
