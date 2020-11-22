@@ -131,7 +131,7 @@ vehicles.add(
     acceleration_controller=(IDMController, {}),
     routing_controller=(MinicityRouter, {}),
     car_following_params=SumoCarFollowingParams(
-        min_gap=2.5,
+        min_gap=5.0,
         decel=7.5,  # avoid collisions at emergency stops
     ),
     lane_change_params=SumoLaneChangeParams(
@@ -152,6 +152,10 @@ vehicles.add(
     veh_id="taxi",
     initial_speed=1,
     acceleration_controller=(RLController, {}),
+    car_following_params=SumoCarFollowingParams(
+        min_gap=5.0,
+        decel=7.5,  # avoid collisions at emergency stops
+    ),
     # lane_change_params=SumoLaneChangeParams(
     #     lane_change_mode="no_lc_safe",
     # ),
@@ -226,7 +230,7 @@ flow_params = dict(
 
     # environment related parameters (see flow.core.params.EnvParams)
     env=EnvParams(
-        horizon=50000,
+        horizon=500,
         additional_params=ADDITIONAL_ENV_PARAMS.copy(),
     ),
 

@@ -73,6 +73,48 @@ class Categorical(nn.Module):
         x = self.linear(x)
         return FixedCategorical(logits=x)
 
+class FixedMultiCategorical:
+
+    def __init__(self, logits=None, action_dims=None):
+        self.action_dims = action_dims
+        self.distributions = [torch.distributions.Categorical(logits=split) for split in torch.split(logits, tuple(self.action_dims), dim=1)]
+
+    def log_probs(self, actions):
+        return torch.stack(
+            [dist.log_prob(action) for dist, action in zip(self.distributions, torch.unbind(actions, dim=1))], dim=1
+        ).sum(dim=1)
+
+    def entropy(self):
+        return torch.stack(
+            [dist.entropy() for dist in self.distributions], dim=1
+        ).sum(dim=1)
+
+    def sample(self):
+        return torch.stack(
+            [dist.sample() for dist in self.distributions], dim=1
+        )
+
+    def mode(self):
+        return torch.stack(
+            [torch.argmax(dist.probs, dim=1) for dist in self.distributions], dim=1
+        )
+
+
+class MultiCategorical(nn.Module):
+    
+    def __init__(self, num_inputs, action_dims):
+        super(MultiCategorical, self).__init__()
+        self.action_dims = action_dims
+        init_ = lambda m: init(
+            m,
+            nn.init.orthogonal_,
+            lambda x: nn.init.constant_(x, 0),
+            gain=0.01)
+        self.linear = init_(nn.Linear(num_inputs, sum(action_dims)))
+
+    def forward(self, x):
+        x = self.linear(x)
+        return FixedMultiCategorical(logits=x, action_dims=self.action_dims)
 
 class DiagGaussian(nn.Module):
     def __init__(self, num_inputs, num_outputs):

@@ -237,6 +237,21 @@ class Env(gym.Env, metaclass=ABCMeta):
             raise FatalFlowError(
                 'Mode %s is not supported!' % self.sim_params.render)
         atexit.register(self.terminate)
+    
+    def restart_simulation_v2(self, sim_params):
+        self.k.close()
+        if self.simulator == 'traci':
+            self.k.simulation.sumo_proc.kill()
+        if sim_params.emission_path is not None:
+            ensure_dir(sim_params.emission_path)
+            self.sim_params.emission_path = sim_params.emission_path
+        
+        self.k.network.generate_network(self.network)
+        self.k.vehicle.initialize(deepcopy(self.network.vehicles))
+        self.k.person.initialize(deepcopy(self.network.persons))
+        kernel_api = self.k.simulation.start_simulation(
+            network=self.k.network, sim_params=self.sim_params)
+        self.k.pass_api(kernel_api)
 
     def restart_simulation(self, sim_params, render=None):
         """Restart an already initialized simulation instance.
@@ -399,6 +414,9 @@ class Env(gym.Env, metaclass=ABCMeta):
             # render a frame
             self.render()
 
+        # compute the info for each agent
+        infos = self._get_infos() if hasattr(self, '_get_infos') else {}
+
         states = self.get_state()
 
         # collect information of the state of the network based on the
@@ -417,9 +435,6 @@ class Env(gym.Env, metaclass=ABCMeta):
         #TODO for debug
         done = self.time_counter >= self.env_params.sims_per_step * \
                 (self.env_params.warmup_steps + self.env_params.horizon)
-
-        # compute the info for each agent
-        infos = self._get_infos() if hasattr(self, '_get_infos') else {}
 
         # compute the reward
         if self.env_params.clip_actions:
@@ -455,6 +470,8 @@ class Env(gym.Env, metaclass=ABCMeta):
             self.sim_params.render = True
             # got to restart the simulation to make it actually display anything
             self.restart_simulation(self.sim_params)
+        else:
+            self.restart_simulation_v2(self.sim_params)
 
         # warn about not using restart_instance when using inflows
         if len(self.net_params.inflows.get()) > 0 and \
@@ -515,6 +532,7 @@ class Env(gym.Env, metaclass=ABCMeta):
                 self.initial_state[veh_id]
 
             try:
+                self.k.vehicle.remove(veh_id)
                 self.k.vehicle.add(
                     veh_id=veh_id,
                     type_id=type_id,
@@ -522,19 +540,20 @@ class Env(gym.Env, metaclass=ABCMeta):
                     lane=lane_index,
                     pos=pos,
                     speed=speed)
-            except (FatalTraCIError, TraCIException):
+            except (FatalTraCIError, TraCIException) as e:
+                print(e)
                 # if a vehicle was not removed in the first attempt, remove it
                 # now and then reintroduce it
-                self.k.vehicle.remove(veh_id)
-                if self.simulator == 'traci':
-                    self.k.kernel_api.vehicle.remove(veh_id)  # FIXME: hack
-                self.k.vehicle.add(
-                    veh_id=veh_id,
-                    type_id=type_id,
-                    edge=edge,
-                    lane=lane_index,
-                    pos=pos,
-                    speed=speed)
+                # self.k.vehicle.remove(veh_id)
+                # if self.simulator == 'traci':
+                #     self.k.kernel_api.vehicle.remove(veh_id)  # FIXME: hack
+                # self.k.vehicle.add(
+                #     veh_id=veh_id,
+                #     type_id=type_id,
+                #     edge=edge,
+                #     lane=lane_index,
+                #     pos=pos,
+                #     speed=speed)
 
         # advance the simulation in the simulator by one step
         self.k.simulation.simulation_step()

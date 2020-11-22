@@ -8,6 +8,9 @@ def get_args(args):
     parser.add_argument(
         '--algo', default='a2c', help='algorithm to use: a2c | ppo | acktr')
     parser.add_argument(
+        '--experiment-name', default='defauld', help='experiment name for save models'
+    )
+    parser.add_argument(
         '--gail',
         action='store_true',
         default=False,

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 # from a2c_ppo_acktr.distributions import Bernoulli, Categorical, DiagGaussian
 # from a2c_ppo_acktr.utils import init
-from .distributions import Bernoulli, Categorical, DiagGaussian
+from .distributions import Bernoulli, Categorical, DiagGaussian, MultiCategorical
 from .utils import init
 
 class Flatten(nn.Module):
@@ -37,6 +37,9 @@ class Policy(nn.Module):
         elif action_space.__class__.__name__ == "MultiBinary":
             num_outputs = action_space.shape[0]
             self.dist = Bernoulli(self.base.output_size, num_outputs)
+        elif action_space.__class__.__name__ == 'MultiDiscrete':
+            nvec = action_space.nvec
+            self.dist = MultiCategorical(self.base.output_size, nvec)
         else:
             raise NotImplementedError
 
