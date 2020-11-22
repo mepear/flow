@@ -1,4 +1,5 @@
 import os
+import copy
 
 import gym
 import numpy as np
@@ -90,9 +91,11 @@ def make_vec_envs(env_name,
             for i in range(num_processes)
         ]
     else:
-        envs = [
-            env_constructor(params=flow_params, version=i)
-            for i in range(num_processes) ]
+        envs = []
+        for i in range(num_processes):
+            env_params = copy.deepcopy(flow_params)
+            env_params['sim'].seed = i + seed
+            envs.append(env_constructor(params=env_params, version=i))
 
     if len(envs) > 1:
         envs = ShmemVecEnv(envs, context='fork')

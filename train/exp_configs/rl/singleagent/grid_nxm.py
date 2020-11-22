@@ -224,7 +224,7 @@ flow_params = dict(
     # sumo-related parameters (see flow.core.params.SumoParams)
     sim=SumoParams(
         sim_step=0.1,
-        render=True,
+        render=False,
         # taxi_dispatch_alg="greedy"
     ),
 
