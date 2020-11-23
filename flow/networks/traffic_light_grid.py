@@ -108,6 +108,7 @@ class TrafficLightGridNetwork(Network):
     def __init__(self,
                  name,
                  vehicles,
+                 persons,
                  net_params,
                  initial_config=InitialConfig(),
                  traffic_lights=TrafficLightParams()):
@@ -160,7 +161,7 @@ class TrafficLightGridNetwork(Network):
         # name of the network (DO NOT CHANGE)
         self.name = "BobLoblawsLawBlog"
 
-        super().__init__(name, vehicles, net_params, initial_config,
+        super().__init__(name, vehicles, net_params, persons, initial_config,
                          traffic_lights)
 
     def specify_nodes(self, net_params):

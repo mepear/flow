@@ -661,6 +661,7 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
             if params['taxi']:
                 type_params_str = {
                     'vClass': 'taxi',
+                    "minGap": str(params['type_params']['minGap'])
                 }
             e = E('vType', id=params['veh_id'], **type_params_str)
             if params['taxi']:
