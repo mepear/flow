@@ -101,18 +101,10 @@ class KernelPerson(object, metaclass=ABCMeta):
         """
         pass
 
-    ###########################################################################
-    # Methods to visually distinguish persons by {walking/waiting, en route}  #
-    ###########################################################################
-
     @abstractmethod
-    def get_color(self, per_id):
-        """Return and RGB tuple of the color of the specified person."""
-        pass
-
-    @abstractmethod
-    def set_color(self, per_id, color):
-        """Set the color of the specified person with the RGB tuple."""
+    def remove(self, per_id):
+        """Remove a person from the network
+        """
         pass
 
     ###########################################################################

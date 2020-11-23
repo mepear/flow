@@ -22,10 +22,9 @@ ADDITIONAL_ENV_PARAMS = {
     "starting_distance": 100,
     "time_price": 0.01,
     "distance_price": 0.03,
-    "person_prob": 0.003
+    "person_prob": 0.03,
+    "max_waiting_time": 10
 }
-
-
 
 class DispatchAndRepositionEnv(Env):
  
@@ -49,6 +48,7 @@ class DispatchAndRepositionEnv(Env):
         self.person_prob = env_params.additional_params['person_prob']
         
         self.max_num_order = env_params.additional_params['max_num_order']
+        self.max_waiting_time = env_params.additional_params['max_waiting_time']
         super().__init__(env_params, sim_params, network, simulator)
 
         # Saving env variables for plotting
@@ -113,20 +113,20 @@ class DispatchAndRepositionEnv(Env):
         occupied_taxi = self.k.vehicle.get_taxi_fleet(1) + self.k.vehicle.get_taxi_fleet(2)
         
         for taxi in self.taxis:
-            while taxi not in self.k.vehicle.get_rl_ids():
-                try:
-                    self.k.vehicle.remove(taxi)
-                    self.k.vehicle.add(
-                        veh_id=taxi,
-                        edge=np.random.choice(self.edges),
-                        type_id='taxi',
-                        lane=str(0),
-                        pos=str(0),
-                        speed=0)
+            # while taxi not in self.k.vehicle.get_rl_ids():
+            #     try:
+            #         self.k.vehicle.remove(taxi)
+            #         self.k.vehicle.add(
+            #             veh_id=taxi,
+            #             edge=np.random.choice(self.edges),
+            #             type_id='taxi',
+            #             lane=str(0),
+            #             pos=str(0),
+            #             speed=0)
                     
-                except TraCIException as e:
-                    print(e)
-                    break
+            #     except TraCIException as e:
+            #         print(e)
+            #         break
             cur_taxi_feature = [0, self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[0]), self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[-1])]
             cur_taxi_feature[0] = 0 if taxi in empty_taxi else 1 if taxi in occupied_taxi else 2
             taxi_feature += cur_taxi_feature
@@ -179,16 +179,18 @@ class DispatchAndRepositionEnv(Env):
         # print('add_request', per_id, 'from', str(edge_id1), 'to', str(edge_id2))
         orders = [[0, 0, 0]] * self.max_num_order
         reservations = self.k.person.get_reservations()
-        self.__reseravtions = [res for res in reservations if res.id not in map(lambda x: x[0].id, self.__dispatched_orders)]
-        for i, res in enumerate(self.__reseravtions):
-            if i >= self.max_num_order:
-                break
-            
+        self.__reservations = [res for res in reservations if res.id not in map(lambda x: x[0].id, self.__dispatched_orders)]
+        count = 0
+        for res in self.__reservations:            
             waiting_time = self.k.kernel_api.person.getWaitingTime(res.persons[0])
+            if waiting_time > self.max_waiting_time:
+                continue
             form_edge = res.fromEdge
             to_edge = res.toEdge
-            orders[i] = [ waiting_time, self.edges.index(form_edge), self.edges.index(to_edge) ]
-        
+            orders[count] = [ waiting_time, self.edges.index(form_edge), self.edges.index(to_edge) ]
+            count += 1
+            if count == self.max_num_order:
+                break
         return np.array(orders).reshape(-1)
 
     # def _apply_rl_actions(self, rl_actions):
@@ -207,7 +209,7 @@ class DispatchAndRepositionEnv(Env):
                 self.__dispatched_orders.append([self.__reseravtions[0], self.taxis[rl_actions[0]]]) # notice that we may dispach a order to a occupied_taxi
         else:
             pass    # nothing to do 
-        self._dispacth_taxi()
+        self._dispatch_taxi()
 
     def compute_reward(self, rl_actions, **kwargs):
         """See class definition."""
@@ -244,7 +246,6 @@ class DispatchAndRepositionEnv(Env):
     def additional_command(self):
         """See parent class."""
         self._check_route_valid()
-        #TODO: remove TLE order
 
     def _check_route_valid(self):
         for veh_id in self.taxis:
@@ -253,7 +254,7 @@ class DispatchAndRepositionEnv(Env):
                 # if the route is not valid, we need to reset the route
                 self.k.kernel_api.vehicle.rerouteTraveltime(veh_id)
     
-    def _dispacth_taxi(self):
+    def _dispatch_taxi(self):
         remain_dispatched_orders = []
 
         for res, veh_id in self.__dispatched_orders:

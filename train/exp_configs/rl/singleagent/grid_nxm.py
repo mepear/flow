@@ -13,7 +13,7 @@ from flow.networks import GridnxmNetwork
 USE_INFLOWS = False
 
 v_enter = 10
-inner_length = 50
+inner_length = 60
 n_rows = 4
 n_columns = 4
 
@@ -118,7 +118,7 @@ def get_non_flow_params(enter_speed, add_net_params):
     """
     additional_init_params = {'enter_speed': enter_speed}
     initial = InitialConfig(
-        spacing='random', min_gap=5, additional_params=additional_init_params)
+        spacing='random', min_gap=10, additional_params=additional_init_params) # gap needs to be large enough
     net = NetParams(additional_params=add_net_params)
 
     return initial, net
@@ -131,8 +131,9 @@ vehicles.add(
     acceleration_controller=(IDMController, {}),
     routing_controller=(MinicityRouter, {}),
     car_following_params=SumoCarFollowingParams(
-        min_gap=5.0,
-        decel=7.5,  # avoid collisions at emergency stops
+        speed_mode='all_checks',
+        min_gap=10.0,
+        decel=10.0,  # avoid collisions at emergency stops
     ),
     lane_change_params=SumoLaneChangeParams(
         lane_change_mode="no_lc_safe",
@@ -153,8 +154,9 @@ vehicles.add(
     initial_speed=1,
     acceleration_controller=(RLController, {}),
     car_following_params=SumoCarFollowingParams(
-        min_gap=5.0,
-        decel=7.5,  # avoid collisions at emergency stops
+        speed_mode='all_checks',
+        min_gap=10.0,
+        decel=10.0,  # avoid collisions at emergency stops
     ),
     # lane_change_params=SumoLaneChangeParams(
     #     lane_change_mode="no_lc_safe",
@@ -195,7 +197,7 @@ additional_net_params = {
     "speed_limit": 35,
     "horizontal_lanes": 2,
     "vertical_lanes": 2,
-    "print_warnings": False, # warnings in building net
+    "print_warnings": True, # warnings in building net
 }
 
 if USE_INFLOWS:
@@ -225,13 +227,13 @@ flow_params = dict(
     sim=SumoParams(
         sim_step=0.1,
         render=False,
-        print_warnings=False,
+        print_warnings=True,
         # taxi_dispatch_alg="greedy"
     ),
 
     # environment related parameters (see flow.core.params.EnvParams)
     env=EnvParams(
-        horizon=1000000,
+        horizon=36000,
         additional_params=ADDITIONAL_ENV_PARAMS.copy(),
     ),
 

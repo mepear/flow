@@ -13,8 +13,8 @@ USE_INFLOWS = False
 
 v_enter = 10
 inner_length = 50
-n_rows = 4
-n_columns = 4
+n_rows = 2
+n_columns = 2
 
 grid_array = {
     "inner_length": inner_length,
@@ -232,7 +232,7 @@ flow_params = dict(
 
     # environment related parameters (see flow.core.params.EnvParams)
     env=EnvParams(
-        horizon=50000,
+        horizon=36000,
         additional_params=ADDITIONAL_ENV_PARAMS.copy(),
     ),
 

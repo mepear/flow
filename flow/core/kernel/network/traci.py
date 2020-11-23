@@ -669,6 +669,8 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
                     'vClass': 'taxi',
                     "minGap": str(params['type_params']['minGap'])
                 }
+            # emergencyBraking
+            type_params_str['emergencyDecel'] = str(100.0)
             e = E('vType', id=params['veh_id'], **type_params_str)
             if params['taxi']:
                 e.append(E('param', key='has.taxi.device', value='true'))

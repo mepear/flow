@@ -152,6 +152,7 @@ class TraCIVehicle(KernelVehicle):
                 # this is meant to resolve the KeyError bug when there are
                 # collisions
                 vehicle_obs[veh_id] = self.__sumo_obs[veh_id]
+            print('update remove', veh_id)
             self.remove(veh_id)
             # remove exiting vehicles from the vehicle subscription if they
             # haven't been removed already
@@ -319,6 +320,7 @@ class TraCIVehicle(KernelVehicle):
         if accel_controller[0] == RLController:
             if veh_id not in self.__rl_ids:
                 self.__rl_ids.append(veh_id)
+            print('_add_departed', self.__rl_ids)
         else:
             if veh_id not in self.__human_ids:
                 self.__human_ids.append(veh_id)
@@ -416,6 +418,8 @@ class TraCIVehicle(KernelVehicle):
             self.__rl_ids.remove(veh_id)
             # make sure that the rl ids remain sorted
             self.__rl_ids.sort()
+            print('remove', self.__rl_ids)
+        
 
         # modify the number of vehicles and RL vehicles
         self.num_vehicles = len(self.get_ids())
@@ -1129,7 +1133,7 @@ class TraCIVehicle(KernelVehicle):
             typeID=str(type_id),
             departLane=str(lane),
             departPos=str(pos),
-            departSpeed=str(speed))
+            departSpeed=str(0)) # in case it touches the arrivalPos too soon
 
     def get_taxi_fleet(self, flag):
         return self.kernel_api.vehicle.getTaxiFleet(flag)

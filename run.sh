@@ -14,4 +14,4 @@ python train/train.py \
     --use-linear-lr-decay \
     --entropy-coef=0.01 \
     --rl_trainer stable-baselines \
-    --render_during_training    
+    --render_during_training
