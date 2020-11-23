@@ -194,7 +194,8 @@ additional_net_params = {
     "grid_array": grid_array,
     "speed_limit": 35,
     "horizontal_lanes": 2,
-    "vertical_lanes": 2
+    "vertical_lanes": 2,
+    "print_warnings": False, # warnings in building net
 }
 
 if USE_INFLOWS:
@@ -206,7 +207,6 @@ else:
     initial_config, net_params = get_non_flow_params(
         enter_speed=v_enter,
         add_net_params=additional_net_params)
-
 
 flow_params = dict(
     # name of the experiment
@@ -225,12 +225,13 @@ flow_params = dict(
     sim=SumoParams(
         sim_step=0.1,
         render=False,
+        print_warnings=False,
         # taxi_dispatch_alg="greedy"
     ),
 
     # environment related parameters (see flow.core.params.EnvParams)
     env=EnvParams(
-        horizon=500,
+        horizon=1000000,
         additional_params=ADDITIONAL_ENV_PARAMS.copy(),
     ),
 

@@ -244,6 +244,7 @@ class DispatchAndRepositionEnv(Env):
     def additional_command(self):
         """See parent class."""
         self._check_route_valid()
+        #TODO: remove TLE order
 
     def _check_route_valid(self):
         for veh_id in self.taxis:

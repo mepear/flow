@@ -509,8 +509,7 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
         x.append(t)
         printxml(x, self.net_path + self.cfgfn)
 
-        subprocess.call(
-            [
+        netconvert_call = [
                 'netconvert -c ' + self.net_path + self.cfgfn +
                 ' --output-file=' + self.cfg_path + self.netfn +
                 ' --no-internal-links="false"' +
@@ -518,7 +517,14 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
                 ' --no-turnarounds="false"' +
                 ' --sidewalks.guess="true"' +
                 ' --default.junctions.radius=0'
-            ],
+            ]
+
+        if 'print_warnings' in net_params.additional_params:
+            if not net_params.additional_params['print_warnings']:
+                netconvert_call[0] += ' --no-warnings="true"'
+
+        subprocess.call(
+            netconvert_call,
             stdout=subprocess.DEVNULL,
             shell=True)
 

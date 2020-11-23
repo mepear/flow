@@ -55,6 +55,10 @@ def parse_args(args):
     parser.add_argument(
         '--checkpoint_path', type=str, default=None,
         help='Directory with checkpoint to restore training from.')
+    parser.add_argument(
+        '--render_during_training', action='store_true',
+        help='Whether render during training'
+    )
 
     return parser.parse_known_args(args)[0]
 
@@ -294,7 +298,7 @@ def train_stable_baselines(submodule, flags):
     from stable_baselines3 import PPO
 
     flow_params = submodule.flow_params
-    flow_params['sim'].render = False
+    flow_params['sim'].render = flags.render_during_training
     # Path to the saved files
     exp_tag = flow_params['exp_tag']
     result_name = '{}/{}'.format(exp_tag, strftime("%Y-%m-%d-%H:%M:%S"))
@@ -321,7 +325,7 @@ def train_stable_baselines(submodule, flags):
     print('Loading the trained model and testing it out!')
     model = PPO.load(save_path)
     # flow_params = get_flow_params(os.path.join(path, result_name) + '.json')
-    flow_params['sim'].render = True
+    flow_params['sim'].render = flags.render_during_training
     env = env_constructor(params=flow_params, version=0)()
     # The algorithms require a vectorized environment to run
     eval_env = DummyVecEnv([lambda: env])
@@ -338,7 +342,7 @@ def train_my_ppo(submodule, flags):
 
     flow_params = submodule.flow_params
     #TODO set sim.render as False when training
-    flow_params['sim'].render = False
+    flow_params['sim'].render = flag.render_during_training
     train_ppo(flow_params)
 
 def main(args):
