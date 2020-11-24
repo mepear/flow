@@ -6,6 +6,7 @@ through an n x m traffic light grid.
 
 import numpy as np
 import re
+import random
 
 from gym.spaces.box import Box
 from gym.spaces.discrete import Discrete
@@ -66,7 +67,7 @@ class DispatchAndRepositionEnv(Env):
         self.num_vehicles = network.vehicles.num_vehicles
 
         self.__dispatched_orders = []
-        self.__reseravtions = []
+        self.__reservations = []
         self.__need_reposition = None
 
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
@@ -133,7 +134,7 @@ class DispatchAndRepositionEnv(Env):
         
         order_feature = self._get_order_state.tolist()
     
-        if self.__reseravtions:
+        if self.__reservations:
             need_reposition_taxi_feature = [-1]
         else:
             empty_taxi_fleet = self.k.vehicle.get_taxi_fleet(0)
@@ -156,7 +157,7 @@ class DispatchAndRepositionEnv(Env):
     def reset(self):
         observation = super().reset()
         self.__dispatched_orders = []
-        self.__reseravtions = []
+        self.__reservations = []
         self.__need_reposition = None
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
         return observation
@@ -179,7 +180,8 @@ class DispatchAndRepositionEnv(Env):
         # print('add_request', per_id, 'from', str(edge_id1), 'to', str(edge_id2))
         orders = [[0, 0, 0]] * self.max_num_order
         reservations = self.k.person.get_reservations()
-        self.__reservations = [res for res in reservations if res.id not in map(lambda x: x[0].id, self.__dispatched_orders)]
+        self.__reservations = [res for res in reservations if res.id not in map(lambda x: x[0].id, self.__dispatched_orders) and self.k.kernel_api.person.getWaitingTime(res.persons[0]) < self.max_waiting_time]
+        random.shuffle(self.__reservations)
         count = 0
         for res in self.__reservations:            
             waiting_time = self.k.kernel_api.person.getWaitingTime(res.persons[0])
@@ -202,11 +204,11 @@ class DispatchAndRepositionEnv(Env):
             self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[1]])
             # print('reposition {} to {}'.format(self.__need_reposition, self.edges[rl_actions[1]]))
             self.__need_reposition = None
-        elif self.__reseravtions:
+        elif self.__reservations:
             if rl_actions[0] == self.num_taxi: # do not dispatch when the specail action is selected
                 pass
             else:
-                self.__dispatched_orders.append([self.__reseravtions[0], self.taxis[rl_actions[0]]]) # notice that we may dispach a order to a occupied_taxi
+                self.__dispatched_orders.append([self.__reservations[0], self.taxis[rl_actions[0]]]) # notice that we may dispach a order to a occupied_taxi
         else:
             pass    # nothing to do 
         self._dispatch_taxi()
