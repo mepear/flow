@@ -15,7 +15,8 @@ from flow.core.params import TrafficLightParams
 from flow.core.params import VehicleParams
 from flow.envs import Env
 from flow.networks import Network
-from ray.cloudpickle import cloudpickle
+# from ray.cloudpickle import cloudpickle
+import cloudpickle
 import inspect
 
 

@@ -82,7 +82,7 @@ class FixedMultiCategorical:
     def log_probs(self, actions):
         return torch.stack(
             [dist.log_prob(action) for dist, action in zip(self.distributions, torch.unbind(actions, dim=1))], dim=1
-        ).sum(dim=1)
+        ).sum(dim=1).unsqueeze(-1)
 
     def entropy(self):
         return torch.stack(
