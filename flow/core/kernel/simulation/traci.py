@@ -248,6 +248,8 @@ class TraCISimulation(KernelSimulation): # TODO: add person & update kernel api
                 logging.debug(" Emission file: " + str(self.emission_path))
                 logging.debug(" Step length: " + str(sim_params.sim_step))
 
+                print(sumo_call)
+
                 # Opening the I/O thread to SUMO
                 self.sumo_proc = subprocess.Popen(
                     sumo_call,

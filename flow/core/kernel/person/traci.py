@@ -96,12 +96,15 @@ class TraCIPerson(KernelPerson):
             self.__persons[per_id]['lane_position'] = self.kernel_api.person.getLanePosition(per_id)
             self.__persons[per_id]['lane_id'] = self.kernel_api.person.getLaneID(per_id)
             self.__persons[per_id]['position'] = self.kernel_api.person.getPosition(per_id)
-        self.__reservations = self.kernel_api.person.getTaxiReservations(False)
+        self.__reservations = self.kernel_api.person.getTaxiReservations(0)
 
     def add(self, per_id, type_id, edge, pos):
         self.kernel_api.person.add(per_id, edge, pos, typeID=type_id)
+
+    def remove(self, per_id):
+        self.kernel_api.person.removeStages(per_id)
     
-    def get_color(self, per_id):
+    def color(self, per_id):
         """See parent class.
 
         This does not pass the last term (i.e. transparency).

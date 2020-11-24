@@ -58,19 +58,21 @@ def add_request(env):
     if np.random.rand() < 0.003:
         person_ids = [int(per_id[4:]) for per_id in env.k.person.get_ids()]
         idx = max(person_ids) + 1 if len(person_ids) > 0 else 1
-        edge_list = env.k.network.get_edge_list()
+        edge_list = env.k.network.get_edge_list().copy()
         edge_id1 = np.random.choice(edge_list)
+        edge_list.remove(edge_id1)
         edge_id2 = np.random.choice(edge_list)
         # node_id = np.random.choice(env.k.network.get_junction_list())
         per_id = 'per_' + str(idx)
+
         env.k.person.kernel_api.person.add(per_id, edge_id1, 20)
         env.k.person.kernel_api.person.appendDrivingStage(per_id, edge_id2, 'taxi')
         env.k.person.kernel_api.person.setColor(per_id, (255, 0, 0))
-        
+
         print('add_request', per_id, 'from', str(edge_id1), 'to', str(edge_id2))
+        
 
 def dispatch_taxi(env):
-
     reservations = env.k.person.get_reservations()
     empty_taxi_fleet_tmp = env.k.vehicle.get_taxi_fleet(0)
     # there would be some problems if the a taxi is on the road started with ":". 
@@ -91,6 +93,8 @@ def reposition_taxi(env):
                 env.k.vehicle.reposition_taxi(taxi, x, y)
 
 def check_taxi_route(env):
+    assert len(env.k.vehicle.get_ids()) == 5
+
     for veh_id in env.k.vehicle.get_ids():
         if env.k.vehicle.kernel_api.vehicle.getTypeID(veh_id) == 'taxi':
             is_route_valid = env.k.vehicle.kernel_api.vehicle.isRouteValid(veh_id)
