@@ -207,7 +207,7 @@ class BaseKernelNetwork(object):
     #            Methods for generating initial vehicle positions.            #
     ###########################################################################
 
-    def generate_starting_positions(self, initial_config, num_vehicles=None):
+    def generate_starting_positions(self, initial_config, num_vehicles=None, net_params=None):
         """Generate starting positions for vehicles in the network.
 
         Calls all other starting position generating classes.
@@ -239,7 +239,7 @@ class BaseKernelNetwork(object):
                 initial_config, num_vehicles)
         elif initial_config.spacing == 'random':
             startpositions, startlanes = self.gen_random_start_pos(
-                initial_config, num_vehicles)
+                initial_config, num_vehicles, net_params)
         elif initial_config.spacing == 'custom':
             startpositions, startlanes = self.gen_custom_start_pos(
                 initial_config, num_vehicles)
@@ -379,7 +379,7 @@ class BaseKernelNetwork(object):
 
         return startpositions, startlanes
 
-    def gen_random_start_pos(self, initial_config, num_vehicles):
+    def gen_random_start_pos(self, initial_config, num_vehicles, net_params):
         """Generate random starting positions.
 
         Parameters
@@ -470,6 +470,8 @@ class BaseKernelNetwork(object):
 
                 pos_i += efs
 
+            if net_params is not None and net_params.additional_params.get('grid_array', {}).get('inner_length', None):
+                pos_i = min(pos_i, net_params.additional_params['grid_array']['inner_length'] - min_gap / 4)
             startpositions.append((edge_i, pos_i))
             startlanes.append(lane_i)
 
