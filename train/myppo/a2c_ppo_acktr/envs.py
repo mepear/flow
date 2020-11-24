@@ -176,9 +176,13 @@ class VecPyTorch(VecEnvWrapper):
         # TODO: Fix data types
 
     def reset(self):
-        obs = self.venv.reset()
-        obs = torch.from_numpy(obs).float().to(self.device)
-        return obs
+        try:
+            obs = self.venv.reset()
+            obs = torch.from_numpy(obs).float().to(self.device)
+            return obs
+
+        except Exception as e:
+            return e
 
     def step_async(self, actions):
         if isinstance(actions, torch.LongTensor):

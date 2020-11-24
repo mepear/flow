@@ -92,8 +92,11 @@ def train_ppo(flow_params=None):
     rollouts = RolloutStorage(args.num_steps, args.num_processes,
                               envs.observation_space.shape, envs.action_space,
                               actor_critic.recurrent_hidden_state_size)
-
-    obs = envs.reset()
+    obs = None
+    while obs is None or isinstance(obs, Exception):
+        obs = envs.reset()
+        if isinstance(obs, Exception):
+            print('warning: reset failed, reset again')
     rollouts.obs[0].copy_(obs)
     rollouts.to(device)
 
@@ -164,7 +167,7 @@ def train_ppo(flow_params=None):
         # save for every interval-th episode or for the last epoch
         if (j % args.save_interval == 0
                 or j == num_updates - 1) and args.save_dir != "":
-            save_path = os.path.join(args.save_dir, args.algo)
+            save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
             try:
                 os.makedirs(save_path)
             except OSError:
@@ -173,7 +176,7 @@ def train_ppo(flow_params=None):
             torch.save([
                 actor_critic,
                 getattr(utils.get_vec_normalize(envs), 'ob_rms', None)
-            ], os.path.join(save_path, args.experiment_name + ".pt"))
+            ], os.path.join(save_path, str(j // args.save_interval) + ".pt"))
 
         if j % args.log_interval == 0 and len(episode_rewards) > 1:
             total_num_steps = (j + 1) * args.num_processes * args.num_steps

@@ -8,7 +8,10 @@ def get_args(args):
     parser.add_argument(
         '--algo', default='a2c', help='algorithm to use: a2c | ppo | acktr')
     parser.add_argument(
-        '--experiment-name', default='defauld', help='experiment name for save models'
+        '--experiment-name', default='default', help='experiment name for save models'
+    )
+    parser.add_argument(
+        "--eval-ckpt", default="0",  type=str
     )
     parser.add_argument(
         '--gail',

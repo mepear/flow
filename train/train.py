@@ -340,10 +340,13 @@ def train_stable_baselines(submodule, flags):
 def train_my_ppo(submodule, flags):
     from myppo.train_ppo import train_ppo
 
-    flow_params = submodule.flow_params
-    #TODO set sim.render as False when training
-    flow_params['sim'].render = flag.render_during_training
-    train_ppo(flow_params)
+    if submodule is None:
+        train_ppo(None)
+    else:
+        flow_params = submodule.flow_params
+        #TODO set sim.render as False when training
+        flow_params['sim'].render = False
+        train_ppo(flow_params)
 
 def main(args):
     """Perform the training operations."""
@@ -368,6 +371,8 @@ def main(args):
             "RLlib. Try running this experiment using RLlib: " \
             "'python train.py EXP_CONFIG'"
         multiagent = True
+    elif flags.exp_config == 'others':
+        submodule = None
     else:
         raise ValueError("Unable to find experiment config.")
 
