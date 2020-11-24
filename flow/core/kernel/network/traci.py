@@ -667,7 +667,8 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
             if params['taxi']:
                 type_params_str = {
                     'vClass': 'taxi',
-                    "minGap": str(params['type_params']['minGap'])
+                    'minGap': str(params['type_params']['minGap']),
+                    'lcStrategic': str(100.0)
                 }
             # emergencyBraking
             type_params_str['emergencyDecel'] = str(100.0)

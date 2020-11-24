@@ -13,7 +13,7 @@ from flow.networks import GridnxmNetwork
 USE_INFLOWS = False
 
 v_enter = 10
-inner_length = 60
+inner_length = 100
 n_rows = 4
 n_columns = 4
 
@@ -158,9 +158,9 @@ vehicles.add(
         min_gap=10.0,
         decel=10.0,  # avoid collisions at emergency stops
     ),
-    # lane_change_params=SumoLaneChangeParams(
-    #     lane_change_mode="no_lc_safe",
-    # ),
+    lane_change_params=SumoLaneChangeParams(
+        lane_change_mode="sumo_default",
+    ),
     num_vehicles=5,
     is_taxi=True)
 
