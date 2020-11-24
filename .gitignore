@@ -111,3 +111,7 @@ flow.ang
 *.ang.old
 *.sang
 
+# models
+trained_models/
+eval_models/
+train_scripts/
