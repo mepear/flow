@@ -305,7 +305,9 @@ class Env(gym.Env, metaclass=ABCMeta):
         # generate starting position for vehicles in the network
         start_pos, start_lanes = self.k.network.generate_starting_positions(
             initial_config=self.initial_config,
-            num_vehicles=len(self.initial_ids))
+            num_vehicles=len(self.initial_ids),
+            net_params=self.net_params,
+            )
 
         # save the initial state. This is used in the _reset function
         for i, veh_id in enumerate(self.initial_ids):

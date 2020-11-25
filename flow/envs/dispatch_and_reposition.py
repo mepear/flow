@@ -97,9 +97,9 @@ class DispatchAndRepositionEnv(Env):
         # )
         # return Tuple((edges_feature, taxi_feature, order_feature))
         state_box = Box(
-            low=-1,
-            high=100,
-            shape=( len(self.edges) + self.num_taxi * 3 + self.max_num_order * 3 + 1, )
+            low=-500,
+            high=500,
+            shape=( len(self.edges) + self.num_taxi * 7 + self.max_num_order * 5 + 3, )
         )
         return state_box
 
@@ -114,28 +114,32 @@ class DispatchAndRepositionEnv(Env):
         occupied_taxi = self.k.vehicle.get_taxi_fleet(1) + self.k.vehicle.get_taxi_fleet(2)
         
         for taxi in self.taxis:
-            # while taxi not in self.k.vehicle.get_rl_ids():
-            #     try:
-            #         self.k.vehicle.remove(taxi)
-            #         self.k.vehicle.add(
-            #             veh_id=taxi,
-            #             edge=np.random.choice(self.edges),
-            #             type_id='taxi',
-            #             lane=str(0),
-            #             pos=str(0),
-            #             speed=0)
+            while taxi not in self.k.vehicle.get_rl_ids():
+                try:
+                    self.k.vehicle.remove(taxi)
+                    self.k.vehicle.add(
+                        veh_id=taxi,
+                        edge=np.random.choice(self.edges),
+                        type_id='taxi',
+                        lane=str(0),
+                        pos=str(0),
+                        speed=0)
                     
-            #     except TraCIException as e:
-            #         print(e)
-            #         break
-            cur_taxi_feature = [0, self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[0]), self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[-1])]
+                except TraCIException as e:
+                    print(e)
+                    break
+            x, y = self.k.vehicle.get_2d_position(taxi, error=(-1, -1))
+            from_x, from_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[0], 0)
+            to_x, to_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[-1], self.inner_length - 2)
+            # cur_taxi_feature = [0, x, y, self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[0]), self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[-1])]
+            cur_taxi_feature = [0, x, y, from_x, from_y, to_x, to_y]
             cur_taxi_feature[0] = 0 if taxi in empty_taxi else 1 if taxi in occupied_taxi else 2
             taxi_feature += cur_taxi_feature
         
         order_feature = self._get_order_state.tolist()
     
         if self.__reservations:
-            need_reposition_taxi_feature = [-1]
+            need_reposition_taxi_feature = [-1, -1, -1]
         else:
             empty_taxi_fleet = self.k.vehicle.get_taxi_fleet(0)
             self.__need_reposition = None
@@ -144,9 +148,11 @@ class DispatchAndRepositionEnv(Env):
                     self.__need_reposition = taxi
                     break
             if self.__need_reposition:
-                need_reposition_taxi_feature = [self.edges.index(self.k.kernel_api.vehicle.getRoadID(self.__need_reposition))]
+                # need_reposition_taxi_feature = [self.edges.index(self.k.kernel_api.vehicle.getRoadID(self.__need_reposition)), self.k.vehicle.get_position(self.__need_reposition)]
+                x, y = self.k.vehicle.get_2d_position(self.__need_reposition, error=(-1, -1))
+                need_reposition_taxi_feature = [self.taxis.index(self.__need_reposition), x, y ]
             else:
-                need_reposition_taxi_feature = [-1]
+                need_reposition_taxi_feature = [-1, -1, -1]
 
         state = edges_feature + taxi_feature + order_feature + need_reposition_taxi_feature
         return np.array(state)
@@ -178,7 +184,7 @@ class DispatchAndRepositionEnv(Env):
             self.k.kernel_api.person.appendDrivingStage(per_id, edge_id2, 'taxi')
             self.k.kernel_api.person.setColor(per_id, (255, 0, 0))
         # print('add_request', per_id, 'from', str(edge_id1), 'to', str(edge_id2))
-        orders = [[0, 0, 0]] * self.max_num_order
+        orders = [[-1, -1, -1, -1, -1]] * self.max_num_order
         reservations = self.k.person.get_reservations()
         self.__reservations = [res for res in reservations if res.id not in map(lambda x: x[0].id, self.__dispatched_orders) and self.k.kernel_api.person.getWaitingTime(res.persons[0]) < self.max_waiting_time]
         random.shuffle(self.__reservations)
@@ -187,9 +193,12 @@ class DispatchAndRepositionEnv(Env):
             waiting_time = self.k.kernel_api.person.getWaitingTime(res.persons[0])
             if waiting_time > self.max_waiting_time:
                 continue
-            form_edge = res.fromEdge
-            to_edge = res.toEdge
-            orders[count] = [ waiting_time, self.edges.index(form_edge), self.edges.index(to_edge) ]
+            # form_edge = res.fromEdge
+            # to_edge = res.toEdge
+            from_x, from_y = self.k.kernel_api.simulation.convert2D(res.fromEdge, res.departPos)
+            to_x, to_y = self.k.kernel_api.simulation.convert2D(res.toEdge, res.arrivalPos)
+            # orders[count] = [ waiting_time, self.edges.index(form_edge), self.edges.index(to_edge) ]
+            orders[count] = [waiting_time, from_x, from_y, to_x, to_y]
             count += 1
             if count == self.max_num_order:
                 break
@@ -242,7 +251,8 @@ class DispatchAndRepositionEnv(Env):
             if taxi not in occupied_taxi and not self.taxi_states[taxi]['empty']:
                 self.taxi_states[taxi]['empty'] = True
                 self.taxi_states[taxi]['pickup_distance'] = None
-        
+        reward -= len(self.edges) * self.time_price * 0.5
+        reward = reward / (self.time_price * len(self.edges))
         return reward
 
     def additional_command(self):

@@ -96,7 +96,7 @@ def train_ppo(flow_params=None):
     while obs is None or isinstance(obs, Exception):
         obs = envs.reset()
         if isinstance(obs, Exception):
-            print('warning: reset failed, reset again')
+            print('warning: reset failed, reset again', obs)
     rollouts.obs[0].copy_(obs)
     rollouts.to(device)
 
@@ -192,9 +192,11 @@ def train_ppo(flow_params=None):
 
         if (args.eval_interval is not None and len(episode_rewards) > 1
                 and j % args.eval_interval == 0):
+            save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
+
             ob_rms = utils.get_vec_normalize(envs).ob_rms
             evaluate(actor_critic, ob_rms, args.env_name, args.seed,
-                     args.num_processes, eval_log_dir, device, flow_params)
+                     args.num_processes, eval_log_dir, device, flow_params, save_path)
 
 
 if __name__ == "__main__":
