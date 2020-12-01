@@ -118,7 +118,7 @@ def train_ppo(flow_params=None):
             with torch.no_grad():
                 value, action, action_log_prob, recurrent_hidden_states = actor_critic.act(
                     rollouts.obs[step], rollouts.recurrent_hidden_states[step],
-                    rollouts.masks[step])
+                    rollouts.masks[step], action_mask=envs.envs[0].get_action_mask())
 
             # Obser reward and next obs
             obs, reward, done, infos = envs.step(action)
@@ -182,7 +182,8 @@ def train_ppo(flow_params=None):
             total_num_steps = (j + 1) * args.num_processes * args.num_steps
             end = time.time()
             print(
-                "Updates {}, num timesteps {}, FPS {} \n Last {} training episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"
+                '\n' + '=' * 20, 
+                "Updates {}, num timesteps {}, FPS {}, Last {} training episodes: mean/median reward {:.1f}/{:.1f}, min/max reward {:.1f}/{:.1f}\n"
                 .format(j, total_num_steps,
                         int(total_num_steps / (end - start)),
                         len(episode_rewards), np.mean(episode_rewards),

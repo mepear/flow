@@ -344,8 +344,7 @@ def train_my_ppo(submodule, flags):
         train_ppo(None)
     else:
         flow_params = submodule.flow_params
-        #TODO set sim.render as False when training
-        flow_params['sim'].render = False
+        flow_params['sim'].render = flags.render_during_training
         train_ppo(flow_params)
 
 def main(args):

@@ -88,6 +88,9 @@ class TraCIVehicle(KernelVehicle):
         # old speeds used to compute accelerations
         self.previous_speeds = {}
 
+        # reservation for each vehicle
+        self.reservation = {}
+
     def initialize(self, vehicles):
         """Initialize vehicle state information.
 
@@ -321,7 +324,6 @@ class TraCIVehicle(KernelVehicle):
         if accel_controller[0] == RLController:
             if veh_id not in self.__rl_ids:
                 self.__rl_ids.append(veh_id)
-            print('_add_departed', self.__rl_ids)
         else:
             if veh_id not in self.__human_ids:
                 self.__human_ids.append(veh_id)
@@ -419,7 +421,6 @@ class TraCIVehicle(KernelVehicle):
             self.__rl_ids.remove(veh_id)
             # make sure that the rl ids remain sorted
             self.__rl_ids.sort()
-            print('remove', self.__rl_ids)
         
 
         # modify the number of vehicles and RL vehicles
@@ -1208,6 +1209,7 @@ class TraCIVehicle(KernelVehicle):
         # route = self.kernel_api.simulation.findRoute(cur_edge, from_edge)
         # self.kernel_api.vehicle.setRoute(veh_id, route.edges)
         self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation.id])
+        self.reservation[veh_id] = reservation
     
     def reposition_taxi(self, veh_id, position_x, position_y):
         try:

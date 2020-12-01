@@ -112,8 +112,11 @@ class MultiCategorical(nn.Module):
             gain=0.01)
         self.linear = init_(nn.Linear(num_inputs, sum(action_dims)))
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
         x = self.linear(x)
+        if mask is not None:
+            assert x.size() == mask.size()
+            x[mask] = -float('inf')
         return FixedMultiCategorical(logits=x, action_dims=self.action_dims)
 
 class DiagGaussian(nn.Module):
@@ -132,7 +135,7 @@ class DiagGaussian(nn.Module):
         #  An ugly hack for my KFAC implementation.
         zeros = torch.zeros(action_mean.size())
         if x.is_cuda:
-            zeros = zeros.cuda()
+            zeros = zeros.to(x.device)
 
         action_logstd = self.logstd(zeros)
         return FixedNormal(action_mean, action_logstd.exp())

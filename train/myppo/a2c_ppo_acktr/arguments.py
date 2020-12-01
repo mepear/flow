@@ -155,6 +155,17 @@ def get_args(args):
         action='store_true',
         default=False,
         help='use a linear schedule on the learning rate')
+    parser.add_argument(
+        '--render-during-training', 
+        action='store_true',
+        help='Whether render during training'
+    )
+    parser.add_argument(
+        '--max-stop-time',
+        type=int,
+        default=128,
+        help='maximum number of steps that a car can stay at the same edge'
+    )
     args = parser.parse_args(args) if args is not None else parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()

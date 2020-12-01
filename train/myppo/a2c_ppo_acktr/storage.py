@@ -20,6 +20,7 @@ class RolloutStorage(object):
             action_shape = 1
         else:
             action_shape = action_space.shape[0]
+        self.action_dim = sum(action_space.nvec)
         self.actions = torch.zeros(num_steps, num_processes, action_shape)
         if action_space.__class__.__name__ == 'Discrete':
             self.actions = self.actions.long()
@@ -42,6 +43,7 @@ class RolloutStorage(object):
         self.actions = self.actions.to(device)
         self.masks = self.masks.to(device)
         self.bad_masks = self.bad_masks.to(device)
+        self.device = device
 
     def insert(self, obs, recurrent_hidden_states, actions, action_log_probs,
                value_preds, rewards, masks, bad_masks):
