@@ -42,12 +42,17 @@ class TraCIPerson(KernelPerson):
         # persons: Key = Person ID, Value = Stage describing the person
         # Ordered dictionary used to keep neural net inputs in order
         self.__persons = collections.OrderedDict()
+        self.__match = {}
+        self.__removed = set()
 
         # reservations
         self.__reservations = []
 
         # current number of persons in the network
         self.num_persons = 0
+
+        # total number of persons
+        self.total = 0
 
         # whether or not to automatically color vehicles
         self._force_color_update = False
@@ -64,10 +69,13 @@ class TraCIPerson(KernelPerson):
             initial person parameter information, including the types of
             individual persons and their initial speeds
         """
+        self.total = 0
         self.num_persons = 0
         self.__persons = collections.OrderedDict()
         self.__ids = []
         self.__reservations = []
+        self.__match = {}
+        self.__removed = set()
 
     def update(self, reset):
         """See parent class.
@@ -101,8 +109,25 @@ class TraCIPerson(KernelPerson):
     def add(self, per_id, type_id, edge, pos):
         self.kernel_api.person.add(per_id, edge, pos, typeID=type_id)
 
+    def add_request(self, per_id, edge_id1, edge_id2, pos):
+        self.kernel_api.person.add(per_id, edge_id1, pos)
+        self.kernel_api.person.appendDrivingStage(per_id, edge_id2, 'taxi')
+        self.kernel_api.person.setColor(per_id, (255, 0, 0))
+        self.total += 1
+
+    def match(self, per_id, veh_id):
+        self.__match[per_id] = veh_id
+
+    def is_matched(self, per_id):
+        return per_id in self.__match
+
     def remove(self, per_id):
-        self.kernel_api.person.removeStages(per_id)
+        # self.kernel_api.person.removeStages(per_id)
+        self.set_color(per_id, WHITE)
+        self.__removed.add(per_id)
+
+    def is_removed(self, per_id):
+        return per_id in self.__removed
     
     def color(self, per_id):
         """See parent class.

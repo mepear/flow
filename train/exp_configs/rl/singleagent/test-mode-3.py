@@ -217,7 +217,7 @@ additional_params["tle_penalty"] = 1.5
 additional_params["person_prob"] = 0.007
 additional_params["max_waiting_time"] = 5.0
 additional_params["max_pickup_time"] = 10.0
-additional_params["distribution"] = 'mode-1'
+additional_params["distribution"] = 'mode-3'
 flow_params = dict(
     # name of the experiment
     exp_tag='grid-intersection',

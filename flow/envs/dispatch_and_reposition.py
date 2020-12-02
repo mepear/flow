@@ -29,7 +29,7 @@ ADDITIONAL_ENV_PARAMS = {
     "person_prob": 0.03,
     "max_waiting_time": 10, # in second
     "max_pickup_time": 20, # in second
-    "max_stop_time": 5, # in second, intentionally waiting time
+    "max_stop_time": 1, # in second, intentionally waiting time
     "stop_distance_eps": 1, # in meter, a threshold to determine whether the car is stopping
     "distribution": 'random', # random, mode-1, mode-2, mode-3
 }
@@ -87,7 +87,7 @@ class DispatchAndRepositionEnv(Env):
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
 
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
-        self.action_mask = torch.zeros((self.num_taxi, sum(self.action_space.nvec)), dtype=bool)
+        self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
 
     def get_action_mask(self):
         if self.__need_reposition:
@@ -95,7 +95,7 @@ class DispatchAndRepositionEnv(Env):
             # print(self.action_mask[taxi_id].unsqueeze(0))
             return self.action_mask[taxi_id].unsqueeze(0)
         else:
-            return torch.zeros((1, sum(self.action_space.nvec)), dtype=bool)
+            return self.action_mask[self.num_taxi].unsqueeze(0)
 
     @property
     def action_space(self):
@@ -197,7 +197,7 @@ class DispatchAndRepositionEnv(Env):
         self.__need_reposition = None
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
-        self.action_mask = torch.zeros((self.num_taxi, sum(self.action_space.nvec)), dtype=bool)
+        self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
         return observation
 
     @property
@@ -218,7 +218,8 @@ class DispatchAndRepositionEnv(Env):
         # print('add_request', per_id, 'from', str(edge_id1), 'to', str(edge_id2))
         orders = [[-1, -1, -1, -1, -1]] * self.max_num_order
         reservations = self.k.person.get_reservations()
-        self.__reservations = [res for res in reservations if res.id not in map(lambda x: x[0].id, self.__dispatched_orders) and self.k.kernel_api.person.getWaitingTime(res.persons[0]) < self.max_waiting_time]
+        cur_time = self.time_counter * self.sim_params.sim_step
+        self.__reservations = [res for res in reservations if res.id not in map(lambda x: x[0].id, self.__dispatched_orders) and cur_time - res.reservationTime < self.max_waiting_time]
         random.shuffle(self.__reservations)
         count = 0
         for res in self.__reservations:            
@@ -247,6 +248,7 @@ class DispatchAndRepositionEnv(Env):
             print('reposition {} to {}'.format(self.__need_reposition, self.edges[rl_actions[1]]))
             self.__need_reposition = None
         elif self.__reservations:
+            assert self.action_mask[self.num_taxi][rl_actions[0]] == False
             if rl_actions[0] == self.num_taxi: # do not dispatch when the special action is selected
                 pass
             else:
@@ -263,7 +265,7 @@ class DispatchAndRepositionEnv(Env):
         distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
         cur_time = self.time_counter * self.sim_params.sim_step
 
-        # pickup price 
+        # pickup price  
         for i, taxi in enumerate(self.taxis):
             if self.taxi_states[taxi]['empty'] and taxi in occupied_taxi and distances[i] > 0:
                 assert self.taxi_states[taxi]['pickup_distance'] is None
@@ -303,6 +305,7 @@ class DispatchAndRepositionEnv(Env):
         self._check_route_valid()
         self._update_action_mask()
         self._add_request()
+        self._remove_tle_request()
 
     def _check_route_valid(self):
         for veh_id in self.taxis:
@@ -320,8 +323,9 @@ class DispatchAndRepositionEnv(Env):
         return False
 
     def _update_action_mask(self):
-        self.action_mask = torch.zeros((self.num_taxi, sum(self.action_space.nvec)), dtype=bool)
+        self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
         distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
+        unavailable = self.k.vehicle.get_taxi_fleet(1) + self.k.vehicle.get_taxi_fleet(2)
         for i, taxi in enumerate(self.taxis):
             q = self.hist_dist[i]
             if q.qsize() == q.maxsize:
@@ -334,18 +338,22 @@ class DispatchAndRepositionEnv(Env):
             if d0 is not None and d1 - d0 < self.stop_distance_eps: 
                 # check whether it stops for a long time intentionally
                 # print('stopping', taxi)
-                next_stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
-                if self._is_blocking(next_stop, taxi):
-                    print(taxi, 'is blocking')
-                    edge_id = self.edges.index(self.k.vehicle.get_edge(taxi))
-                    self.action_mask[i][self.num_taxi + 1 + edge_id] = True
+                stops = self.k.kernel_api.vehicle.getStops(taxi, limit=1)
+                if len(stops) > 0:
+                    next_stop = stops[0]
+                    if self._is_blocking(next_stop, taxi):
+                        print(taxi, 'is blocking')
+                        edge_id = self.edges.index(self.k.vehicle.get_edge(taxi))
+                        self.action_mask[i][self.num_taxi + 1 + edge_id] = True
+
+            if taxi in unavailable:
+                self.action_mask[self.num_taxi][i] = True
 
     def _add_request(self):
         if np.random.rand() > self.person_prob:
             return 
         if self.distribution == 'random':
-            person_ids = [int(per_id[4:]) for per_id in self.k.person.get_ids()]
-            idx = max(person_ids) + 1 if len(person_ids) > 0 else 1
+            idx = self.k.person.total
             edge_list = self.edges.copy()
             edge_id1 = np.random.choice(edge_list)
             edge_list.remove(edge_id1)
@@ -353,26 +361,55 @@ class DispatchAndRepositionEnv(Env):
 
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(self.inner_length)
-            self.k.kernel_api.person.add(per_id, edge_id1, pos)
-            self.k.kernel_api.person.appendDrivingStage(per_id, edge_id2, 'taxi')
-            self.k.kernel_api.person.setColor(per_id, (255, 0, 0))
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         elif self.distribution == 'mode-1': 
             # the request only appears at one edge
-            person_ids = [int(per_id[4:]) for per_id in self.k.person.get_ids()]
-            idx = max(person_ids) + 1 if len(person_ids) > 0 else 1
+            idx = self.k.person.total
             edge_list = self.edges.copy()
             edge_id1 = 'bot3_1_0'
             edge_list.remove(edge_id1)
-            edge_id2 = np.random.choice(edge_list)
+            edge_id2 = 'top2_1_0'
 
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(self.inner_length)
-            self.k.kernel_api.person.add(per_id, edge_id1, pos)
-            self.k.kernel_api.person.appendDrivingStage(per_id, edge_id2, 'taxi')
-            self.k.kernel_api.person.setColor(per_id, (255, 0, 0))
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-2':
+            # the request only appears at two different edges
+            idx = self.k.person.total
+            edge_list = self.edges.copy()
+            rn =  np.random.rand()
+            edge_id1 = 'bot3_1_0' if rn < 0.5 else 'bot0_3_0'
+            edge_list.remove(edge_id1)
+            edge_id2 = 'top2_1_0' if rn < 0.5 else 'top1_3_0'
+
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(self.inner_length)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-3':
+            # the request appears at one edge before half of the time
+            # the request appears at another edge after half of the time
+            idx = self.k.person.total
+            edge_list = self.edges.copy()
+            time_ratio = self.time_counter / self.env_params.horizon
+            edge_id1 = 'bot3_1_0' if time_ratio < 0.5 else 'bot0_3_0'
+            edge_list.remove(edge_id1)
+            edge_id2 = 'top2_1_0' if time_ratio < 0.5 else 'top1_3_0'
+
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(self.inner_length)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         else:
             raise NotImplementedError
-        print('add request from', edge_id1, 'to', edge_id2)
+        print('add request from', edge_id1, 'to', edge_id2, 'total', self.k.person.total)
+
+
+    def _remove_tle_request(self):
+        idlist = self.k.kernel_api.person.getIDList()
+        for person in idlist:
+            if self.k.kernel_api.person.getWaitingTime(person) > self.max_waiting_time:
+                if not self.k.person.is_matched(person) and not self.k.person.is_removed(person):
+                    self.k.person.remove(person)
+                    print('tle request', person)
 
     
     def _dispatch_taxi(self):
@@ -384,8 +421,9 @@ class DispatchAndRepositionEnv(Env):
             if self.k.kernel_api.vehicle.getRoadID(veh_id).startswith(':') or veh_id not in self.k.vehicle.get_taxi_fleet(0):
                 remain_dispatched_orders.append([res, veh_id])
             elif self.k.kernel_api.person.getWaitingTime(res.persons[0]) <= self.max_waiting_time:
-                print('dispatch {} to {}'.format(res, veh_id))
                 self.k.vehicle.dispatch_taxi(veh_id, res)
+                self.k.person.match(res.persons[0], veh_id)
+                print('dispatch {} to {}, remaining {} available taxis'.format(res, veh_id, len(self.k.vehicle.get_taxi_fleet(0))))
             else:
                 print('order {} dispatch tle'.format(res))
         self.__dispatched_orders = remain_dispatched_orders

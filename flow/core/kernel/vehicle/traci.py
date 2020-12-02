@@ -19,6 +19,8 @@ WHITE = (255, 255, 255)
 CYAN = (0, 255, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
+YELLOW = (255, 255, 0)
+ORANGE = (255, 69, 0)
 STEPS = 10
 rdelta = 255 / STEPS
 # smoothly go from red to green as the speed increases
@@ -1073,10 +1075,11 @@ class TraCIVehicle(KernelVehicle):
             except (FatalTraCIError, TraCIException) as e:
                 print('Error when updating human vehicle colors:', e)
 
+        free, pickup, service = self.get_taxi_fleet(0), self.get_taxi_fleet(1), self.get_taxi_fleet(2)
         for veh_id in self.get_ids():
             try:
                 if 'taxi' in veh_id:
-                    color = GREEN
+                    color = (GREEN if veh_id in free else ORANGE) if veh_id not in pickup else YELLOW
                     # If vehicle is already being colored via argument to vehicles.add(), don't re-color it.
                     if self._force_color_update or 'color' not in \
                             self.type_parameters[self.get_type(veh_id)]:
