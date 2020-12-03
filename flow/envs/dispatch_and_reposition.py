@@ -325,7 +325,7 @@ class DispatchAndRepositionEnv(Env):
     def _update_action_mask(self):
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
         distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
-        unavailable = self.k.vehicle.get_taxi_fleet(1) + self.k.vehicle.get_taxi_fleet(2)
+        # unavailable = self.k.vehicle.get_taxi_fleet(1) + self.k.vehicle.get_taxi_fleet(2)
         for i, taxi in enumerate(self.taxis):
             q = self.hist_dist[i]
             if q.qsize() == q.maxsize:
@@ -346,8 +346,8 @@ class DispatchAndRepositionEnv(Env):
                         edge_id = self.edges.index(self.k.vehicle.get_edge(taxi))
                         self.action_mask[i][self.num_taxi + 1 + edge_id] = True
 
-            if taxi in unavailable:
-                self.action_mask[self.num_taxi][i] = True
+            # if taxi in unavailable:
+            #     self.action_mask[self.num_taxi][i] = True
 
     def _add_request(self):
         if np.random.rand() > self.person_prob:

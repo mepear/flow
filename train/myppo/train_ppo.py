@@ -113,15 +113,19 @@ def train_ppo(flow_params=None):
                 agent.optimizer, j, num_updates,
                 agent.optimizer.lr if args.algo == "acktr" else args.lr)
 
+        action_mask = None
         for step in range(args.num_steps):
             # Sample actions
             with torch.no_grad():
                 value, action, action_log_prob, recurrent_hidden_states = actor_critic.act(
                     rollouts.obs[step], rollouts.recurrent_hidden_states[step],
-                    rollouts.masks[step], action_mask=envs.envs[0].get_action_mask())
+                    rollouts.masks[step], action_mask=action_mask)
 
             # Obser reward and next obs
             obs, reward, done, infos = envs.step(action)
+
+            # action_mask
+            action_mask = torch.cat([info['action_mask'] for info in infos], dim=0)
 
             for info in infos:
                 if 'episode' in info.keys():
