@@ -112,7 +112,7 @@ def train_ppo(flow_params=None):
     rollouts.obs[0].copy_(obs)
     rollouts.to(device)
 
-    episode_rewards = deque(maxlen=10)
+    episode_rewards = deque(maxlen=args.num_processes)
 
     start = time.time()
     num_updates = int(
@@ -209,7 +209,17 @@ def train_ppo(flow_params=None):
                         np.median(episode_rewards), np.min(episode_rewards),
                         np.max(episode_rewards), dist_entropy, value_loss,
                         action_loss))
-            writer.add_scalar("rewards/training", episode_rewards[-1], total_num_steps)
+            writer.add_scalars(
+                    "rewards/training", 
+                    {
+                        "mean": np.mean(episode_rewards), 
+                        "median": np.median(episode_rewards),
+                        "max": np.max(episode_rewards),
+                        "min": np.min(episode_rewards)
+                    },
+                total_num_steps
+                )
+
 
         if (args.eval_interval is not None and len(episode_rewards) > 1
                 and j % args.eval_interval == 0):
@@ -217,7 +227,7 @@ def train_ppo(flow_params=None):
             total_num_steps = (j + 1) * args.num_processes * args.num_steps
             ob_rms = utils.get_vec_normalize(envs).ob_rms
             evaluate(actor_critic, ob_rms, args.env_name, args.seed,
-                     args.num_processes, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
+                     8, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
 
 
 if __name__ == "__main__":
