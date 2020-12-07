@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from collections import deque
+import random
 
 import gym
 import numpy as np
@@ -11,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 
 from .a2c_ppo_acktr import algo, utils
 from .a2c_ppo_acktr.algo import gail
@@ -25,6 +27,9 @@ def train_ppo(flow_params=None):
 
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
 
     if args.cuda and torch.cuda.is_available() and args.cuda_deterministic:
         torch.backends.cudnn.benchmark = False
@@ -34,6 +39,13 @@ def train_ppo(flow_params=None):
     eval_log_dir = log_dir + "_eval"
     utils.cleanup_log_dir(log_dir)
     utils.cleanup_log_dir(eval_log_dir)
+    save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
+    try:
+        os.makedirs(save_path)
+    except OSError:
+        pass
+    
+    writer = SummaryWriter(os.path.join(save_path, 'tensorboard_logs'))
 
     torch.set_num_threads(1)
     device = torch.device("cuda:0" if args.cuda else "cpu")
@@ -165,17 +177,20 @@ def train_ppo(flow_params=None):
                                  args.gae_lambda, args.use_proper_time_limits)
 
         value_loss, action_loss, dist_entropy = agent.update(rollouts)
+        writer.add_scalar('training loss/value loss', value_loss, (j + 1) * args.num_processes * args.num_steps)
+        writer.add_scalar('training loss/action loss', action_loss, (j + 1) * args.num_processes * args.num_steps)
+        writer.add_scalar('training loss/dist_entropy', dist_entropy, (j + 1) * args.num_processes * args.num_steps)
 
         rollouts.after_update()
 
         # save for every interval-th episode or for the last epoch
         if (j % args.save_interval == 0
                 or j == num_updates - 1) and args.save_dir != "":
-            save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
-            try:
-                os.makedirs(save_path)
-            except OSError:
-                pass
+            # save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
+            # try:
+            #     os.makedirs(save_path)
+            # except OSError:
+            #     pass
 
             torch.save([
                 actor_critic,
@@ -194,14 +209,15 @@ def train_ppo(flow_params=None):
                         np.median(episode_rewards), np.min(episode_rewards),
                         np.max(episode_rewards), dist_entropy, value_loss,
                         action_loss))
+            writer.add_scalar("rewards/training", episode_rewards[-1], total_num_steps)
 
         if (args.eval_interval is not None and len(episode_rewards) > 1
                 and j % args.eval_interval == 0):
-            save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
-
+            # save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
+            total_num_steps = (j + 1) * args.num_processes * args.num_steps
             ob_rms = utils.get_vec_normalize(envs).ob_rms
             evaluate(actor_critic, ob_rms, args.env_name, args.seed,
-                     args.num_processes, eval_log_dir, device, flow_params, save_path)
+                     args.num_processes, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
 
 
 if __name__ == "__main__":

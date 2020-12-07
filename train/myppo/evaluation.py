@@ -7,7 +7,7 @@ from .a2c_ppo_acktr.envs import make_vec_envs
 
 
 def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
-             device, flow_params, save_path=None):
+             device, flow_params, save_path=None, writer=None, total_num_steps=None):
     # flow_params['sim'].render = True
     eval_envs = make_vec_envs(env_name, seed + num_processes, num_processes,
                               None, eval_log_dir, device, True, flow_params=flow_params)
@@ -27,14 +27,14 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
     eval_recurrent_hidden_states = torch.zeros(
         num_processes, actor_critic.recurrent_hidden_state_size, device=device)
     eval_masks = torch.zeros(num_processes, 1, device=device)
-
+    action_mask = None
     while len(eval_episode_rewards) < 8:
         with torch.no_grad():
             _, action, _, eval_recurrent_hidden_states = actor_critic.act(
                 obs,
                 eval_recurrent_hidden_states,
                 eval_masks,
-                action_mask=eval_envs.envs[0].get_action_mask(),
+                action_mask=action_mask,
                 deterministic=True)
 
         # Obser reward and next obs
@@ -44,6 +44,8 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
             [[0.0] if done_ else [1.0] for done_ in done],
             dtype=torch.float32,
             device=device)
+        
+        action_mask = torch.cat([info['action_mask'] for info in infos], dim=0)
 
         for info in infos:
             if 'episode' in info.keys():
@@ -57,3 +59,6 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
         with open(os.path.join(save_path, 'eval.txt'), 'a') as f:
             f.write(" Evaluation using {} episodes: mean reward {:.5f}\n".format(
             len(eval_episode_rewards), np.mean(eval_episode_rewards)))
+    if writer:
+        assert total_num_steps is not None
+        writer.add_scalar('rewards/eval', np.mean(eval_episode_rewards), total_num_steps)
