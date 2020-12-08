@@ -137,7 +137,10 @@ def train_ppo(flow_params=None):
             obs, reward, done, infos = envs.step(action)
 
             # action_mask
-            action_mask = torch.cat([info['action_mask'] for info in infos], dim=0)
+            try:
+                action_mask = torch.cat([info['action_mask'] for info in infos], dim=0)
+            except KeyError:
+                action_mask = None
 
             for info in infos:
                 if 'episode' in info.keys():

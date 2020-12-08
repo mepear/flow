@@ -45,7 +45,10 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
             dtype=torch.float32,
             device=device)
         
-        action_mask = torch.cat([info['action_mask'] for info in infos], dim=0)
+        try:
+            action_mask = torch.cat([info['action_mask'] for info in infos], dim=0)
+        except KeyError:
+            action_mask = None
 
         for info in infos:
             if 'episode' in info.keys():
