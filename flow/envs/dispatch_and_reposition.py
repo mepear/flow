@@ -285,10 +285,14 @@ class DispatchAndRepositionEnv(Env):
         for i, taxi in enumerate(self.taxis):
             # price about distance
             if taxi in occupied_taxi and self.taxi_states[taxi]['pickup_distance'] and distances[i] - self.taxi_states[taxi]['pickup_distance'] > self.starting_distance:
+                if (distances[i] - self.taxi_states[taxi]['distance']) * self.distance_price > 100:
+                    print(distances[i], self.taxi_states[taxi]['distance'])
+                    raise Exception
                 reward += (distances[i] - self.taxi_states[taxi]['distance']) * self.distance_price
 
             # update distance
-            self.taxi_states[taxi]['distance'] = distances[i]
+            if distances[i] > 0:
+                self.taxi_states[taxi]['distance'] = distances[i]
             
             # check empty
             if taxi not in occupied_taxi and not self.taxi_states[taxi]['empty']:
@@ -296,8 +300,8 @@ class DispatchAndRepositionEnv(Env):
                 self.taxi_states[taxi]['pickup_distance'] = None
         normalizing_term = len(self.taxis) * \
             (self.pickup_price + self.sim_params.sim_step * self.time_price + 55.55 * self.sim_params.sim_step * self.distance_price) # default maxSpeed = 55.55 m/s
-        reward -= normalizing_term * 0.5
-        reward = reward / normalizing_term
+        # reward -= normalizing_term * 0.5
+        reward = reward / self.env_params.horizon
         return reward
 
     def additional_command(self):
@@ -350,7 +354,7 @@ class DispatchAndRepositionEnv(Env):
             #     self.action_mask[self.num_taxi][i] = True
 
     def _add_request(self):
-        if np.random.rand() > self.person_prob:
+        if np.random.rand() > self.person_prob * self.sim_params.sim_step:
             return 
         if self.distribution == 'random':
             idx = self.k.person.total
