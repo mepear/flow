@@ -20,7 +20,8 @@ class RolloutStorage(object):
             action_shape = 1
         else:
             action_shape = action_space.shape[0]
-        self.action_dim = sum(action_space.nvec)
+        if hasattr(action_space, 'nvec'):
+            self.action_dim = sum(action_space.nvec)
         self.actions = torch.zeros(num_steps, num_processes, action_shape)
         if action_space.__class__.__name__ == 'Discrete':
             self.actions = self.actions.long()
