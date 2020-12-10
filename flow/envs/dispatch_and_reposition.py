@@ -301,7 +301,7 @@ class DispatchAndRepositionEnv(Env):
         normalizing_term = len(self.taxis) * \
             (self.pickup_price + self.sim_params.sim_step * self.time_price + 55.55 * self.sim_params.sim_step * self.distance_price) # default maxSpeed = 55.55 m/s
         # reward -= normalizing_term * 0.5
-        reward = reward / self.env_params.horizon
+        # reward = reward / self.env_params.horizon
         return reward
 
     def additional_command(self):

@@ -83,7 +83,9 @@ def make_vec_envs(env_name,
                   device,
                   allow_early_resets,
                   num_frame_stack=None,
-                  flow_params=None):
+                  popart_reward=False,
+                  flow_params=None,
+                  reward_scale=None):
 
     if flow_params is None:
         envs = [
@@ -95,7 +97,7 @@ def make_vec_envs(env_name,
         for i in range(num_processes):
             env_params = copy.deepcopy(flow_params)
             env_params['sim'].seed = i + seed
-            envs.append(env_constructor(params=env_params, version=i))
+            envs.append(env_constructor(params=env_params, version=i, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale))
 
     if len(envs) > 1:
         # envs = ShmemVecEnv(envs, context='fork')

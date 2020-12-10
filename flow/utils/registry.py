@@ -9,6 +9,7 @@ from copy import deepcopy
 import flow.envs
 from flow.core.params import InitialConfig
 from flow.core.params import TrafficLightParams, PersonParams
+from flow.utils.runningstat import RunningStat
 
 import numpy as np
 from typing import List, Optional, Tuple, Union
@@ -81,7 +82,13 @@ class Monitor(gym.Wrapper):
             if value is None:
                 raise ValueError("Expected you to pass kwarg {} into reset".format(key))
             self.current_reset_info[key] = value
-        return self.env.reset(**kwargs)
+        observation = None
+        while observation is None:
+            try:
+                observation = self.env.reset(**kwargs)
+            except Exception as e:
+                print("reset error with {}, reset again".format(e))
+        return observation
 
     def step(self, action: Union[np.ndarray, int]):
         """
@@ -147,10 +154,47 @@ class Monitor(gym.Wrapper):
         :return:
         """
         return self.episode_times
+    
+class RewardScaling(gym.Wrapper):
+    def __init__(
+        self,
+        env: gym.Env,
+        popart_reward: bool,
+        gamma: int,
+        reward_scale=None,
+        clip=None
+    ):
+        super().__init__(env=env)
+        shape = ()
+        self.gamma = gamma
+        self.reward_scale = reward_scale
+        self.popart_reward = popart_reward
+        self.rs = RunningStat(shape=shape)
+        self.ret = np.zeros(shape)
+        self.clip = clip
+    
+    def reset(self, **kwargs):
+        self.ret = np.zeros_like(self.ret)
+        return self.env.reset(**kwargs)
+    
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+
+        scaled_reward = reward / self.reward_scale if self.reward_scale else reward
+        
+        if self.popart_reward:
+            self.ret = self.ret * self.gamma + scaled_reward
+            self.rs.push(self.ret)
+            scaled_reward = scaled_reward / (self.rs.std + 1e-8)
+        if self.clip:
+            scaled_reward = np.clip(scaled_reward, -self.clip, self.clip)
+        return observation, scaled_reward, done, info
+    
+    def close(self):
+        super().close()
 
 
-
-def make_create_env(params, version=0, render=None):
+def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None):
     """Create a parametrized flow environment compatible with OpenAI gym.
 
     This environment creation method allows for the specification of several
@@ -276,12 +320,14 @@ def make_create_env(params, version=0, render=None):
                 "simulator": params['simulator']
             })
 
-        return Monitor( gym.envs.make(env_name) )
+        env =  Monitor( gym.envs.make(env_name) )
+        env = RewardScaling(env, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale)
+        return env
 
     return create_env, env_name
 
 
-def env_constructor(params, version=0, render=None):
+def env_constructor(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None):
     """Return a constructor from make_create_env."""
-    create_env, env_name = make_create_env(params, version, render)
+    create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, reward_scale)
     return create_env

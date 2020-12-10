@@ -14,6 +14,12 @@ def get_args(args):
         "--eval-ckpt", default="0",  type=str
     )
     parser.add_argument(
+        '--popart-reward', action="store_true", default=False, help='enable popart when scaling the reward'
+    )
+    parser.add_argument(
+        "--reward-scale", default=None, type=float, help="the scale for reward scaling"
+    )
+    parser.add_argument(
         '--gail',
         action='store_true',
         default=False,
