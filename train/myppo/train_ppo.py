@@ -104,11 +104,9 @@ def train_ppo(flow_params=None):
     rollouts = RolloutStorage(args.num_steps, args.num_processes,
                               envs.observation_space.shape, envs.action_space,
                               actor_critic.recurrent_hidden_state_size)
-    obs = None
-    while obs is None or isinstance(obs, Exception):
-        obs = envs.reset()
-        if isinstance(obs, Exception):
-            print('warning: reset failed, reset again', obs)
+
+    obs = envs.reset()
+    
     rollouts.obs[0].copy_(obs)
     rollouts.to(device)
 
