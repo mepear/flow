@@ -252,6 +252,8 @@ class Env(gym.Env, metaclass=ABCMeta):
         kernel_api = self.k.simulation.start_simulation(
             network=self.k.network, sim_params=self.sim_params)
         self.k.pass_api(kernel_api)
+        self.setup_initial_state()
+
 
     def restart_simulation(self, sim_params, render=None):
         """Restart an already initialized simulation instance.

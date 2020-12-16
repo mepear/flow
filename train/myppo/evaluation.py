@@ -9,7 +9,7 @@ from .a2c_ppo_acktr.envs import make_vec_envs
 def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
              device, flow_params, save_path=None, writer=None, total_num_steps=None):
     # flow_params['sim'].render = True
-    eval_envs = make_vec_envs(env_name, seed + num_processes, num_processes,
+    eval_envs = make_vec_envs(env_name, seed, num_processes,
                               None, eval_log_dir, device, True, flow_params=flow_params)
 
     vec_norm = utils.get_vec_normalize(eval_envs)
@@ -18,6 +18,9 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
         vec_norm.ob_rms = ob_rms
 
     eval_episode_rewards = []
+    nums_complete_orders = []
+    total_pickup_distances = []
+    total_valid_distances = []
 
     obs = eval_envs.reset()
 
@@ -50,6 +53,9 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
         for info in infos:
             if 'episode' in info.keys():
                 eval_episode_rewards.append(info['episode']['r'])
+                nums_complete_orders.append(info['episode']['num_complete_orders'])
+                total_pickup_distances.append(info['episode']['total_pickup_distance'])
+                total_valid_distances.append(info['episode']['total_valid_distance'])
 
     eval_envs.close()
 
@@ -61,4 +67,44 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
             len(eval_episode_rewards), np.mean(eval_episode_rewards)))
     if writer:
         assert total_num_steps is not None
-        writer.add_scalar('rewards/eval', np.mean(eval_episode_rewards), total_num_steps)
+        # writer.add_scalar('rewards/eval', np.mean(eval_episode_rewards), total_num_steps)
+        writer.add_scalars(
+                "rewards/eval", 
+                {
+                    "mean": np.mean(eval_episode_rewards), 
+                    "median": np.median(eval_episode_rewards),
+                    "max": np.max(eval_episode_rewards),
+                    "min": np.min(eval_episode_rewards)
+                },
+            total_num_steps
+            )
+        writer.add_scalars(
+                "eval/order", 
+                {
+                    "mean": np.mean(nums_complete_orders), 
+                    "median": np.median(nums_complete_orders),
+                    "max": np.max(nums_complete_orders),
+                    "min": np.min(nums_complete_orders)
+                },
+            total_num_steps
+            )
+        writer.add_scalars(
+                "eval/pickup_distance", 
+                {
+                    "mean": np.mean(total_pickup_distances), 
+                    "median": np.median(total_pickup_distances),
+                    "max": np.max(total_pickup_distances),
+                    "min": np.min(total_pickup_distances)
+                },
+            total_num_steps
+            )
+        writer.add_scalars(
+                "eval/valid_distance", 
+                {
+                    "mean": np.mean(total_valid_distances), 
+                    "median": np.median(total_valid_distances),
+                    "max": np.max(total_valid_distances),
+                    "min": np.min(total_valid_distances)
+                },
+            total_num_steps
+            )

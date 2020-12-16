@@ -60,6 +60,10 @@ class DispatchAndRepositionEnv(Env):
         self.max_waiting_time = env_params.additional_params['max_waiting_time']
         self.max_pickup_time = env_params.additional_params['max_pickup_time']
 
+        self.num_complete_orders = 0
+        self.total_valid_distance = 0
+        self.total_pickup_distance = 0
+
         self.stop_distance_eps = env_params.additional_params['stop_distance_eps']
         
         self.distribution = env_params.additional_params['distribution']
@@ -142,6 +146,7 @@ class DispatchAndRepositionEnv(Env):
         
         for taxi in self.taxis:
             while taxi not in self.k.vehicle.get_rl_ids():
+                self.taxi_states[taxi] = {"empty": True, "distance": 0, "pickup_distance": None}
                 try:
                     self.k.vehicle.remove(taxi)
                     self.k.vehicle.add(
@@ -198,6 +203,9 @@ class DispatchAndRepositionEnv(Env):
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
+        self.num_complete_orders = 0
+        self.total_valid_distance = 0
+        self.total_pickup_distance = 0
         return observation
 
     @property
@@ -292,12 +300,18 @@ class DispatchAndRepositionEnv(Env):
 
             # update distance
             if distances[i] > 0:
+                assert distances[i] >= self.taxi_states[taxi]['distance'], (distances[i], self.taxi_states[taxi]['distance'])
+                if taxi in occupied_taxi:
+                    self.total_valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
+                elif taxi in pickup_taxi:
+                    self.total_pickup_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                 self.taxi_states[taxi]['distance'] = distances[i]
             
             # check empty
             if taxi not in occupied_taxi and not self.taxi_states[taxi]['empty']:
                 self.taxi_states[taxi]['empty'] = True
                 self.taxi_states[taxi]['pickup_distance'] = None
+                self.num_complete_orders += 1
         normalizing_term = len(self.taxis) * \
             (self.pickup_price + self.sim_params.sim_step * self.time_price + 55.55 * self.sim_params.sim_step * self.distance_price) # default maxSpeed = 55.55 m/s
         # reward -= normalizing_term * 0.5
@@ -354,7 +368,7 @@ class DispatchAndRepositionEnv(Env):
             #     self.action_mask[self.num_taxi][i] = True
 
     def _add_request(self):
-        if np.random.rand() > self.person_prob * self.sim_params.sim_step:
+        if np.random.rand() > self.person_prob * self.sim_params.sim_step and self.distribution != "mode-4" and self.distribution != "mode-5":
             return 
         if self.distribution == 'random':
             idx = self.k.person.total
@@ -401,6 +415,38 @@ class DispatchAndRepositionEnv(Env):
 
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(self.inner_length)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-4':
+            if self.time_counter % 20 != 1:
+                return
+            # the request appears at one edge before half of the time
+            # the request appears at another edge after half of the time
+            idx = self.k.person.total
+            edge_list = self.edges.copy()
+            time_ratio = self.time_counter / self.env_params.horizon
+            edge_id1 = 'bot3_1_0' if time_ratio < 0.5 else 'bot0_3_0'
+            edge_list.remove(edge_id1)
+            edge_id2 = 'top2_1_0' if time_ratio < 0.5 else 'top1_3_0'
+
+            per_id = 'per_' + str(idx)
+            # pos = np.random.uniform(self.inner_length)
+            pos = self.time_counter % self.grid_array['inner_length']
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-5':
+            if self.time_counter % 5 != 1:
+                return
+            # the request appears at one edge before half of the time
+            # the request appears at another edge after half of the time
+            idx = self.k.person.total
+            edge_list = self.edges.copy()
+            time_ratio = self.time_counter / self.env_params.horizon
+            edge_id1 = 'bot3_1_0' if time_ratio < 0.5 else 'bot0_3_0'
+            edge_list.remove(edge_id1)
+            edge_id2 = 'top2_1_0' if time_ratio < 0.5 else 'top1_3_0'
+
+            per_id = 'per_' + str(idx)
+            # pos = np.random.uniform(self.inner_length)
+            pos = self.time_counter % self.grid_array['inner_length']
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         else:
             raise NotImplementedError

@@ -96,7 +96,7 @@ def make_vec_envs(env_name,
         envs = []
         for i in range(num_processes):
             env_params = copy.deepcopy(flow_params)
-            env_params['sim'].seed = i + seed
+            env_params['sim'].seed = seed
             envs.append(env_constructor(params=env_params, version=i, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale))
 
     if len(envs) > 1:

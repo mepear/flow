@@ -111,6 +111,9 @@ def train_ppo(flow_params=None):
     rollouts.to(device)
 
     episode_rewards = deque(maxlen=args.num_processes)
+    nums_complete_orders = deque(maxlen=args.num_processes)
+    total_pickup_distances = deque(maxlen=args.num_processes)
+    total_valid_distances = deque(maxlen=args.num_processes)
 
     start = time.time()
     num_updates = int(
@@ -143,6 +146,9 @@ def train_ppo(flow_params=None):
             for info in infos:
                 if 'episode' in info.keys():
                     episode_rewards.append(info['episode']['r'])
+                    nums_complete_orders.append(info['episode']['num_complete_orders'])
+                    total_pickup_distances.append(info['episode']['total_pickup_distance'])
+                    total_valid_distances.append(info['episode']['total_valid_distance'])
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor(
@@ -220,15 +226,48 @@ def train_ppo(flow_params=None):
                     },
                 total_num_steps
                 )
+            writer.add_scalars(
+                    "training/order", 
+                    {
+                        "mean": np.mean(nums_complete_orders), 
+                        "median": np.median(nums_complete_orders),
+                        "max": np.max(nums_complete_orders),
+                        "min": np.min(nums_complete_orders)
+                    },
+                total_num_steps
+                )
+            writer.add_scalars(
+                    "training/pickup_distance", 
+                    {
+                        "mean": np.mean(total_pickup_distances), 
+                        "median": np.median(total_pickup_distances),
+                        "max": np.max(total_pickup_distances),
+                        "min": np.min(total_pickup_distances)
+                    },
+                total_num_steps
+                )
+            writer.add_scalars(
+                    "training/valid_distance", 
+                    {
+                        "mean": np.mean(total_valid_distances), 
+                        "median": np.median(total_valid_distances),
+                        "max": np.max(total_valid_distances),
+                        "min": np.min(total_valid_distances)
+                    },
+                total_num_steps
+                )
 
 
-        if (args.eval_interval is not None and len(episode_rewards) > 1
+        if (args.eval_interval is not None and len(episode_rewards) > 0
                 and j % args.eval_interval == 0):
             # save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
             total_num_steps = (j + 1) * args.num_processes * args.num_steps
             ob_rms = utils.get_vec_normalize(envs).ob_rms
-            evaluate(actor_critic, ob_rms, args.env_name, args.seed,
-                     8, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
+            try:
+                evaluate(actor_critic, ob_rms, args.env_name, args.seed,
+                        8, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
+            except:
+                pass
 
 
 if __name__ == "__main__":

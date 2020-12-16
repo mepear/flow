@@ -110,6 +110,9 @@ class Monitor(gym.Wrapper):
             self.episode_rewards.append(ep_rew)
             self.episode_lengths.append(ep_len)
             self.episode_times.append(time.time() - self.t_start)
+            ep_info['num_complete_orders'] = self.env.num_complete_orders
+            ep_info['total_pickup_distance'] = self.env.total_pickup_distance
+            ep_info['total_valid_distance'] = self.env.total_valid_distance
             ep_info.update(self.current_reset_info)
             if self.logger:
                 self.logger.writerow(ep_info)
