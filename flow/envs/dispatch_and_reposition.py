@@ -89,6 +89,7 @@ class DispatchAndRepositionEnv(Env):
         self.__need_reposition = None
 
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
+        self.stop_time = [None] * len(self.taxis)
 
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
@@ -206,6 +207,7 @@ class DispatchAndRepositionEnv(Env):
         self.num_complete_orders = 0
         self.total_valid_distance = 0
         self.total_pickup_distance = 0
+        self.stop_time = [None] * len(self.taxis)
         return observation
 
     @property
@@ -306,7 +308,7 @@ class DispatchAndRepositionEnv(Env):
                 elif taxi in pickup_taxi:
                     self.total_pickup_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                 self.taxi_states[taxi]['distance'] = distances[i]
-            
+
             # check empty
             if taxi not in occupied_taxi and not self.taxi_states[taxi]['empty']:
                 self.taxi_states[taxi]['empty'] = True
@@ -324,6 +326,7 @@ class DispatchAndRepositionEnv(Env):
         self._update_action_mask()
         self._add_request()
         self._remove_tle_request()
+        self._check_arrived()
 
     def _check_route_valid(self):
         for veh_id in self.taxis:
@@ -339,6 +342,43 @@ class DispatchAndRepositionEnv(Env):
             if min(abs(p0 - p), abs(p1 - p)) < self.stop_distance_eps:
                 return True
         return False
+    
+    def _check_arrived(self):
+        
+        def is_arrived(veh_id, edge, pos):
+            cur_edge = self.k.vehicle.get_edge(veh_id)
+            if cur_edge == edge:
+                cur_pos = self.k.vehicle.get_position(veh_id)
+                if abs(cur_pos - pos) < 10:
+                    return True
+            return False
+
+        for i,  taxi in enumerate(self.taxis):
+            if self.k.vehicle.is_pickup(taxi):
+                tgt_edge, tgt_pos = self.k.vehicle.pickup_stop[taxi]
+            elif self.k.vehicle.is_occupied(taxi):
+                tgt_edge, tgt_pos = self.k.vehicle.dropoff_stop[taxi]
+            elif self.k.vehicle.is_free(taxi):
+                if len(self.k.kernel_api.vehicle.getStops(taxi)) == 0:
+                    self.k.vehicle.stop(taxi)
+                continue
+            else:
+                continue
+
+            if is_arrived(taxi, tgt_edge, tgt_pos):
+                if self.stop_time[i] is None:
+                    self.k.kernel_api.vehicle.setSpeed(taxi, 0)
+                    self.stop_time[i] = 0
+                else:
+                    self.stop_time[i] += 1
+            
+            assert self.stop_time[i] is None or self.stop_time[i] <= 3
+            if self.stop_time[i] == 3:
+                self.stop_time[i] = None
+                if self.k.vehicle.is_pickup(taxi):
+                    self.k.vehicle.pickup(taxi)
+                elif self.k.vehicle.is_occupied(taxi):
+                    self.k.vehicle.dropoff(taxi)
 
     def _update_action_mask(self):
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)

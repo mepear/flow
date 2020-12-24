@@ -206,8 +206,8 @@ class TraCISimulation(KernelSimulation): # TODO: add person & update kernel api
                 sumo_call.append('--device.taxi.idle-algorithm')
                 sumo_call.append('stop')
 
-                sumo_call.append('--device.taxi.dispatch-period')
-                sumo_call.append('1')
+                sumo_call.append('--collision.action')
+                sumo_call.append('none')
 
                 # use a ballistic integration step (if request)
                 if sim_params.use_ballistic:

@@ -92,6 +92,12 @@ class TraCIVehicle(KernelVehicle):
 
         # reservation for each vehicle
         self.reservation = {}
+        self.pickup_stop = {}
+        self.dropoff_stop = {}
+
+        self.__free_taxis = set()
+        self.__pickup_taxis = set()
+        self.__occupied_taxis = set()
 
     def initialize(self, vehicles):
         """Initialize vehicle state information.
@@ -121,6 +127,8 @@ class TraCIVehicle(KernelVehicle):
                 self.num_vehicles += 1
                 if typ['acceleration_controller'][0] == RLController:
                     self.num_rl_vehicles += 1
+                if typ['veh_id'] == 'taxi':
+                    self.__free_taxis.add(veh_id)
 
     def update(self, reset):
         """See parent class.
@@ -1141,7 +1149,13 @@ class TraCIVehicle(KernelVehicle):
             departSpeed=str(0)) # in case it touches the arrivalPos too soon
 
     def get_taxi_fleet(self, flag):
-        return self.kernel_api.vehicle.getTaxiFleet(flag)
+        # return self.kernel_api.vehicle.getTaxiFleet(flag)
+        if flag == 0:
+            return list(self.__free_taxis)
+        elif flag == 1:
+            return list(self.__pickup_taxis)
+        elif flag == 2:
+            return list(self.__occupied_taxis)
 
     def get_max_speed(self, veh_id, error=-1001):
         """See parent class."""
@@ -1207,12 +1221,50 @@ class TraCIVehicle(KernelVehicle):
         # if cur_edge.startswith(':'):
         #     return
         #TODO : if rerouting is needed?
+        cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
+        stops = self.kernel_api.vehicle.getStops(veh_id)
+        if len(stops) > 0:
+            # self.kernel_api.vehicle.resume(veh_id)
+            self.kernel_api.vehicle.replaceStop(veh_id, 0, stops[0].lane[:-2], stops[0].endPos, 0, 0)
 
-        # from_edge = reservation.fromEdge
-        # route = self.kernel_api.simulation.findRoute(cur_edge, from_edge)
-        # self.kernel_api.vehicle.setRoute(veh_id, route.edges)
-        self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation.id])
+        from_edge = reservation.fromEdge
+        route = self.kernel_api.simulation.findRoute(cur_edge, from_edge)
+        self.kernel_api.vehicle.setRoute(veh_id, route.edges)
+        # self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation.id])
         self.reservation[veh_id] = reservation
+        self.pickup_stop[veh_id] = [ reservation.fromEdge, reservation.departPos ]
+        self.dropoff_stop[veh_id] = [ reservation.toEdge, 25 ]
+        self.__free_taxis.remove(veh_id)
+        self.__pickup_taxis.add(veh_id)
+    
+    def pickup(self, veh_id):
+        cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
+        to_edge = self.reservation[veh_id].toEdge
+        route = self.kernel_api.simulation.findRoute(cur_edge, to_edge)
+        self.kernel_api.vehicle.setRoute(veh_id, route.edges)
+        self.__pickup_taxis.remove(veh_id)
+        self.__occupied_taxis.add(veh_id)
+        self.kernel_api.vehicle.setSpeed(veh_id, -1)
+    
+    def dropoff(self, veh_id):
+        self.__occupied_taxis.remove(veh_id)
+        self.__free_taxis.add(veh_id)
+        self.stop(veh_id)
+        self.kernel_api.vehicle.setSpeed(veh_id, -1)
+
+    def stop(self,veh_id):
+        cur_edge = self.get_edge(veh_id)
+        cur_pos = self.get_position(veh_id)
+        self.kernel_api.vehicle.setStop(veh_id, cur_edge, cur_pos + 1, 0, 600)
+    
+    def is_free(self, veh_id):
+        return veh_id in self.__free_taxis
+    
+    def is_pickup(self, veh_id):
+        return veh_id in self.__pickup_taxis
+    
+    def is_occupied(self, veh_id):
+        return veh_id in self.__occupied_taxis
     
     def reposition_taxi(self, veh_id, position_x, position_y):
         try:
