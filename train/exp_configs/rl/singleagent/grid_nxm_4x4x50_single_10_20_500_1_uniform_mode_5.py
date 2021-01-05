@@ -63,35 +63,29 @@ vehicles.add(
         speed_mode='all_checks',
         min_gap=5,
         decel=10.0,  # avoid collisions at emergency stops
+        max_speed=10,
     ),
     lane_change_params=SumoLaneChangeParams(
         lane_change_mode="no_lc_safe",
     ),
     initial_speed=0,
     num_vehicles=20)
-# vehicles.add(
-#     veh_id="rl",
-#     acceleration_controller=(RLController, {}),
-#     routing_controller=(MinicityRouter, {}),
-#     car_following_params=SumoCarFollowingParams(
-#         speed_mode="obey_safe_speed",
-#     ),
-#     initial_speed=0,
-#     num_vehicles=5)
 vehicles.add(
     veh_id="taxi",
     initial_speed=0,
     acceleration_controller=(RLController, {}),
+    # routing_controller=(MinicityRouter, {}),
     car_following_params=SumoCarFollowingParams(
         speed_mode='all_checks',
         min_gap=5,
         decel=10.0,  # avoid collisions at emergency stops
+        max_speed=10,
     ),
     lane_change_params=SumoLaneChangeParams(
         lane_change_mode="sumo_default",
     ),
     num_vehicles=10,
-    is_taxi=True)
+    is_taxi=False)
 
 tl_logic = TrafficLightParams(baseline=False)
 phases = [{
