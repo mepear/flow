@@ -93,6 +93,7 @@ class TraCIVehicle(KernelVehicle):
         # reservation for each vehicle
         self.reservation = {}
         self.pickup_stop = {}
+        self.mid_edges = {}
         self.dropoff_stop = {}
 
         self.__free_taxis = set()
@@ -1216,7 +1217,7 @@ class TraCIVehicle(KernelVehicle):
         # TODO : Brent
         return 0
 
-    def dispatch_taxi(self, veh_id, reservation):
+    def dispatch_taxi(self, veh_id, reservation, mid_edges):
         # cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
         # if cur_edge.startswith(':'):
         #     return
@@ -1233,19 +1234,30 @@ class TraCIVehicle(KernelVehicle):
         # self.kernel_api.vehicle.dispatchTaxi(veh_id, [reservation.id])
         self.reservation[veh_id] = reservation
         self.pickup_stop[veh_id] = [ reservation.fromEdge, reservation.departPos ]
+        self.mid_edges[veh_id] = mid_edges
         self.dropoff_stop[veh_id] = [ reservation.toEdge, 25 ]
         self.__free_taxis.remove(veh_id)
         self.__pickup_taxis.add(veh_id)
     
     def pickup(self, veh_id):
         cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
-        to_edge = self.reservation[veh_id].toEdge
+        to_edge = self.reservation[veh_id].toEdge if len(self.mid_edges[veh_id]) == 0 \
+            else self.mid_edges[veh_id][0]
         route = self.kernel_api.simulation.findRoute(cur_edge, to_edge)
         self.kernel_api.vehicle.setRoute(veh_id, route.edges)
         self.__pickup_taxis.remove(veh_id)
         self.__occupied_taxis.add(veh_id)
         self.kernel_api.vehicle.setSpeed(veh_id, -1)
     
+    def checkpoint(self, veh_id):
+        cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
+        self.mid_edges[veh_id].pop(0)
+        to_edge = self.reservation[veh_id].toEdge if len(self.mid_edges[veh_id]) == 0 \
+            else self.mid_edges[veh_id][0]
+        route = self.kernel_api.simulation.findRoute(cur_edge, to_edge)
+        self.kernel_api.vehicle.setRoute(veh_id, route.edges)
+        self.kernel_api.vehicle.setSpeed(veh_id, -1)
+
     def dropoff(self, veh_id):
         self.__occupied_taxis.remove(veh_id)
         self.__free_taxis.add(veh_id)
