@@ -111,9 +111,14 @@ def train_ppo(flow_params=None):
     rollouts.to(device)
 
     episode_rewards = deque(maxlen=args.num_processes)
+    nums_orders = deque(maxlen=args.num_processes)
     nums_complete_orders = deque(maxlen=args.num_processes)
     total_pickup_distances = deque(maxlen=args.num_processes)
+    total_pickup_times = deque(maxlen=args.num_processes)
     total_valid_distances = deque(maxlen=args.num_processes)
+    total_valid_times = deque(maxlen=args.num_processes)
+    total_wait_times = deque(maxlen=args.num_processes)
+    total_congestion_rates = deque(maxlen=args.num_processes)
 
     start = time.time()
     num_updates = int(
@@ -146,9 +151,14 @@ def train_ppo(flow_params=None):
             for info in infos:
                 if 'episode' in info.keys():
                     episode_rewards.append(info['episode']['r'])
+                    nums_orders.append(info['episode']['num_orders'])
                     nums_complete_orders.append(info['episode']['num_complete_orders'])
                     total_pickup_distances.append(info['episode']['total_pickup_distance'])
+                    total_pickup_times.append(info['episode']['total_pickup_time'])
                     total_valid_distances.append(info['episode']['total_valid_distance'])
+                    total_valid_times.append(info['episode']['total_valid_time'])
+                    total_wait_times.append(info['episode']['total_wait_time'])
+                    total_congestion_rates.append(info['episode']['total_congestion_rate'])
 
             # If done then clean the history of observations.
             masks = torch.FloatTensor(
@@ -216,8 +226,10 @@ def train_ppo(flow_params=None):
                         np.median(episode_rewards), np.min(episode_rewards),
                         np.max(episode_rewards), dist_entropy, value_loss,
                         action_loss))
+            denom = np.array(nums_complete_orders, dtype=int)
+            denom2 = np.array(nums_orders, dtype=int)
             writer.add_scalars(
-                    "rewards/training", 
+                    "rewards/train", 
                     {
                         "mean": np.mean(episode_rewards), 
                         "median": np.median(episode_rewards),
@@ -227,7 +239,7 @@ def train_ppo(flow_params=None):
                 total_num_steps
                 )
             writer.add_scalars(
-                    "training/order", 
+                    "train/order", 
                     {
                         "mean": np.mean(nums_complete_orders), 
                         "median": np.median(nums_complete_orders),
@@ -236,23 +248,68 @@ def train_ppo(flow_params=None):
                     },
                 total_num_steps
                 )
+            array = np.ma.masked_invalid(total_pickup_distances / denom)
             writer.add_scalars(
-                    "training/pickup_distance", 
+                    "train/pickup_distance", 
                     {
-                        "mean": np.mean(total_pickup_distances), 
-                        "median": np.median(total_pickup_distances),
-                        "max": np.max(total_pickup_distances),
-                        "min": np.min(total_pickup_distances)
+                        "mean": np.mean(array),
+                        "median": np.median(array),
+                        "max": np.max(array),
+                        "min": np.min(array)
+                    },
+                total_num_steps
+                )
+            array = np.ma.masked_invalid(total_pickup_times / denom)
+            writer.add_scalars(
+                    "train/pickup_time", 
+                    {
+                        "mean": np.mean(array),
+                        "median": np.median(array),
+                        "max": np.max(array),
+                        "min": np.min(array)
+                    },
+                total_num_steps
+                )
+            array = np.ma.masked_invalid(total_valid_distances / denom)
+            writer.add_scalars(
+                    "train/valid_distance", 
+                    {
+                        "mean": np.mean(array),
+                        "median": np.median(array),
+                        "max": np.max(array),
+                        "min": np.min(array)
+                    },
+                total_num_steps
+                )
+            array = np.ma.masked_invalid(total_valid_times / denom)
+            writer.add_scalars(
+                    "train/valid_time", 
+                    {
+                        "mean": np.mean(array),
+                        "median": np.median(array),
+                        "max": np.max(array),
+                        "min": np.min(array)
+                    },
+                total_num_steps
+                )
+            array = np.ma.masked_invalid(total_wait_times / denom2)
+            writer.add_scalars(
+                    "train/wait_time", 
+                    {
+                        "mean": np.mean(array),
+                        "median": np.median(array),
+                        "max": np.max(array),
+                        "min": np.min(array)
                     },
                 total_num_steps
                 )
             writer.add_scalars(
-                    "training/valid_distance", 
+                    "train/congestion_rate", 
                     {
-                        "mean": np.mean(total_valid_distances), 
-                        "median": np.median(total_valid_distances),
-                        "max": np.max(total_valid_distances),
-                        "min": np.min(total_valid_distances)
+                        "mean": np.mean(total_congestion_rates), 
+                        "median": np.median(total_congestion_rates),
+                        "max": np.max(total_congestion_rates),
+                        "min": np.min(total_congestion_rates)
                     },
                 total_num_steps
                 )

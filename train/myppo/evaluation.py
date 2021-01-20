@@ -18,9 +18,14 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
         vec_norm.ob_rms = ob_rms
 
     eval_episode_rewards = []
+    nums_orders = []
     nums_complete_orders = []
     total_pickup_distances = []
+    total_pickup_times = []
     total_valid_distances = []
+    total_valid_times = []
+    total_wait_times = []
+    total_congestion_rates = []
 
     obs = eval_envs.reset()
 
@@ -53,9 +58,14 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
         for info in infos:
             if 'episode' in info.keys():
                 eval_episode_rewards.append(info['episode']['r'])
+                nums_orders.append(info['episode']['num_orders'])
                 nums_complete_orders.append(info['episode']['num_complete_orders'])
                 total_pickup_distances.append(info['episode']['total_pickup_distance'])
+                total_pickup_times.append(info['episode']['total_pickup_time'])
                 total_valid_distances.append(info['episode']['total_valid_distance'])
+                total_valid_times.append(info['episode']['total_valid_time'])
+                total_wait_times.append(info['episode']['total_wait_time'])
+                total_congestion_rates.append(info['episode']['total_congestion_rate'])
 
     eval_envs.close()
 
@@ -68,6 +78,8 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
     if writer:
         assert total_num_steps is not None
         # writer.add_scalar('rewards/eval', np.mean(eval_episode_rewards), total_num_steps)
+        denom = np.array(nums_complete_orders, dtype=int)
+        denom2 = np.array(nums_orders, dtype=int)
         writer.add_scalars(
                 "rewards/eval", 
                 {
@@ -88,23 +100,68 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
                 },
             total_num_steps
             )
+        array = np.ma.masked_invalid(total_pickup_distances / denom)
         writer.add_scalars(
                 "eval/pickup_distance", 
                 {
-                    "mean": np.mean(total_pickup_distances), 
-                    "median": np.median(total_pickup_distances),
-                    "max": np.max(total_pickup_distances),
-                    "min": np.min(total_pickup_distances)
+                    "mean": np.nanmean(array), 
+                    "median": np.nanmedian(array),
+                    "max": np.nanmax(array),
+                    "min": np.nanmin(array)
+                },
+            total_num_steps
+            )
+        array = np.ma.masked_invalid(total_pickup_times / denom)
+        writer.add_scalars(
+                "eval/pickup_time", 
+                {
+                    "mean": np.nanmean(array), 
+                    "median": np.nanmedian(array),
+                    "max": np.nanmax(array),
+                    "min": np.nanmin(array)
+                },
+            total_num_steps
+            )
+        array = np.ma.masked_invalid(total_valid_distances / denom)
+        writer.add_scalars(
+                "eval/valid_distance", 
+                {
+                    "mean": np.nanmean(array), 
+                    "median": np.nanmedian(array),
+                    "max": np.nanmax(array),
+                    "min": np.nanmin(array)
+                },
+            total_num_steps
+            )
+        array = np.ma.masked_invalid(total_valid_times / denom)
+        writer.add_scalars(
+                "eval/valid_time", 
+                {
+                    "mean": np.nanmean(array), 
+                    "median": np.nanmedian(array),
+                    "max": np.nanmax(array),
+                    "min": np.nanmin(array)
+                },
+            total_num_steps
+            )
+        array = np.ma.masked_invalid(total_wait_times / denom2)
+        writer.add_scalars(
+                "eval/wait_time", 
+                {
+                    "mean": np.nanmean(array), 
+                    "median": np.nanmedian(array),
+                    "max": np.nanmax(array),
+                    "min": np.nanmin(array)
                 },
             total_num_steps
             )
         writer.add_scalars(
-                "eval/valid_distance", 
+                "eval/congestion_rate", 
                 {
-                    "mean": np.mean(total_valid_distances), 
-                    "median": np.median(total_valid_distances),
-                    "max": np.max(total_valid_distances),
-                    "min": np.min(total_valid_distances)
+                    "mean": np.mean(total_congestion_rates), 
+                    "median": np.median(total_congestion_rates),
+                    "max": np.max(total_congestion_rates),
+                    "min": np.min(total_congestion_rates)
                 },
             total_num_steps
             )

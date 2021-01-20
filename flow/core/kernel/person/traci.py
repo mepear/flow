@@ -123,7 +123,7 @@ class TraCIPerson(KernelPerson):
 
     def remove(self, per_id):
         # self.kernel_api.person.removeStages(per_id)
-        self.set_color(per_id, WHITE)
+        self.set_color(per_id, (0, 0, 0))
         self.__removed.add(per_id)
 
     def is_removed(self, per_id):

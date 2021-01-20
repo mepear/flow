@@ -25,6 +25,7 @@ ADDITIONAL_ENV_PARAMS = {
     "starting_distance": 100,
     "time_price": 0.01, # in second
     "distance_price": 0.03, # in meter
+    "wait_penalty": 0.0, # in second
     "tle_penalty": 0.005, # in second
     "person_prob": 0.03,
     "max_waiting_time": 10, # in second
@@ -32,6 +33,7 @@ ADDITIONAL_ENV_PARAMS = {
     "max_stop_time": 1, # in second, intentionally waiting time
     "stop_distance_eps": 1, # in meter, a threshold to determine whether the car is stopping
     "distribution": 'random', # random, mode-1, mode-2, mode-3
+    "reservation_order": 'random', # random or fifo 
 }
 
 class DispatchAndRepositionEnv(Env):
@@ -51,6 +53,7 @@ class DispatchAndRepositionEnv(Env):
         self.pickup_price = env_params.additional_params['pickup_price']
         self.time_price = env_params.additional_params['time_price']
         self.distance_price = env_params.additional_params['distance_price']
+        self.wait_penalty = env_params.additional_params['wait_penalty']
         self.tle_penalty = env_params.additional_params['tle_penalty']
         self.starting_distance = env_params.additional_params['starting_distance']
 
@@ -60,9 +63,15 @@ class DispatchAndRepositionEnv(Env):
         self.max_waiting_time = env_params.additional_params['max_waiting_time']
         self.max_pickup_time = env_params.additional_params['max_pickup_time']
 
+        self.reservation_order = env_params.additional_params['reservation_order']
+
         self.num_complete_orders = 0
         self.total_valid_distance = 0
+        self.total_valid_time = 0
         self.total_pickup_distance = 0
+        self.total_pickup_time = 0
+        self.total_wait_time = 0
+        self.total_congestion_rate = 0
 
         self.stop_distance_eps = env_params.additional_params['stop_distance_eps']
         
@@ -106,7 +115,7 @@ class DispatchAndRepositionEnv(Env):
     @property
     def action_space(self):
         """See class definition."""
-        return MultiDiscrete([self.num_taxi + 1, len(self.edges)])
+        return MultiDiscrete([self.num_taxi + 1, len(self.edges)]) # TODO: add routing
 
     @property
     def observation_space(self):
@@ -148,20 +157,7 @@ class DispatchAndRepositionEnv(Env):
         
         for taxi in self.taxis:
             while taxi not in self.k.vehicle.get_rl_ids():
-                self.taxi_states[taxi] = {"empty": True, "distance": 0, "pickup_distance": None}
-                try:
-                    self.k.vehicle.remove(taxi)
-                    self.k.vehicle.add(
-                        veh_id=taxi,
-                        edge=np.random.choice(self.edges),
-                        type_id='taxi',
-                        lane=str(0),
-                        pos=str(0),
-                        speed=0)
-                    
-                except TraCIException as e:
-                    print(e)
-                    break
+                raise KeyError
             x, y = self.k.vehicle.get_2d_position(taxi, error=(-1, -1))
             from_x, from_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[0], 0)
             to_x, to_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[-1], self.inner_length - 2)
@@ -208,7 +204,11 @@ class DispatchAndRepositionEnv(Env):
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
         self.num_complete_orders = 0
         self.total_valid_distance = 0
+        self.total_valid_time = 0
         self.total_pickup_distance = 0
+        self.total_pickup_time = 0
+        self.total_wait_time = 0
+        self.total_congestion_rate = 0
         self.stop_time = [None] * len(self.taxis)
         return observation
 
@@ -233,7 +233,8 @@ class DispatchAndRepositionEnv(Env):
         cur_time = self.time_counter * self.sim_params.sim_step
         issued_orders = self.__dispatched_orders + self.__pending_orders
         self.__reservations = [res for res in reservations if res.id not in map(lambda x: x[0].id, issued_orders) and cur_time - res.reservationTime < self.max_waiting_time]
-        random.shuffle(self.__reservations)
+        if self.reservation_order == 'random':
+            random.shuffle(self.__reservations)
         count = 0
         for res in self.__reservations:            
             waiting_time = self.k.kernel_api.person.getWaitingTime(res.persons[0])
@@ -258,7 +259,7 @@ class DispatchAndRepositionEnv(Env):
             # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
             # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
             self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[1]])
-            print('reposition {} to {}'.format(self.__need_reposition, self.edges[rl_actions[1]]))
+            print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[1]], self.k.vehicle.get_edge(self.__need_reposition)))
             self.__need_reposition = None
         elif self.__reservations:
             assert self.action_mask[self.num_taxi][rl_actions[0]] == False
@@ -283,6 +284,19 @@ class DispatchAndRepositionEnv(Env):
         occupied_taxi = self.k.vehicle.get_taxi_fleet(2)
         distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
         cur_time = self.time_counter * self.sim_params.sim_step
+
+        num_congestion = 0.0
+        for edge in self.edges:
+            if self.k.kernel_api.edge.getLastStepVehicleNumber(edge) > 0:
+                if self.k.kernel_api.edge.getLastStepMeanSpeed(edge) < 3.0: # a threshold for congestion
+                    num_congestion += 1
+        self.total_congestion_rate += num_congestion / len(self.edges)
+
+        for person in self.k.person.get_ids():
+            if self.k.person.is_matched(person) or self.k.person.is_removed(person):
+                continue
+            reward -= self.wait_penalty * self.sim_params.sim_step
+            self.total_wait_time += self.sim_params.sim_step
 
         # pickup price  
         for i, taxi in enumerate(self.taxis):
@@ -314,8 +328,10 @@ class DispatchAndRepositionEnv(Env):
                 assert distances[i] >= self.taxi_states[taxi]['distance'], (distances[i], self.taxi_states[taxi]['distance'])
                 if taxi in occupied_taxi:
                     self.total_valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
+                    self.total_valid_time += self.sim_params.sim_step
                 elif taxi in pickup_taxi:
                     self.total_pickup_distance += (distances[i] - self.taxi_states[taxi]['distance'])
+                    self.total_pickup_time += self.sim_params.sim_step
                 self.taxi_states[taxi]['distance'] = distances[i]
 
             # check empty
@@ -343,14 +359,6 @@ class DispatchAndRepositionEnv(Env):
             if not is_route_valid:
                 # if the route is not valid, we need to reset the route
                 self.k.kernel_api.vehicle.rerouteTraveltime(veh_id)
-
-    def _is_blocking(self, stop, taxi):
-        if self.k.vehicle.get_edge(taxi) in stop.lane:
-            p = self.k.vehicle.get_position(taxi)
-            p0, p1 = stop.startPos, stop.endPos
-            if min(abs(p0 - p), abs(p1 - p)) < self.stop_distance_eps:
-                return True
-        return False
     
     def _check_arrived(self):
         
@@ -386,32 +394,51 @@ class DispatchAndRepositionEnv(Env):
                 self.stop_time[i] = None
                 if self.k.vehicle.is_pickup(taxi):
                     self.k.vehicle.pickup(taxi)
+                    res = self.k.vehicle.reservation[taxi]
+                    self.k.person.set_color(res.persons[0], (255, 255, 255)) # White
                 elif self.k.vehicle.is_occupied(taxi):
                     self.k.vehicle.dropoff(taxi)
+                    res = self.k.vehicle.reservation[taxi]
+                    self.k.person.remove(res.persons[0])
 
     def _update_action_mask(self):
+
+        # def _is_blocking(stop, taxi):
+        #     if self.k.vehicle.get_edge(taxi) in stop.lane:
+        #         p = self.k.vehicle.get_position(taxi)
+        #         p0, p1 = stop.startPos, stop.endPos
+        #         if min(abs(p0 - p), abs(p1 - p)) < self.stop_distance_eps:
+        #             return True
+        #     return False
+
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
-        distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
+        # distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
         # unavailable = self.k.vehicle.get_taxi_fleet(1) + self.k.vehicle.get_taxi_fleet(2)
         for i, taxi in enumerate(self.taxis):
-            q = self.hist_dist[i]
-            if q.qsize() == q.maxsize:
-                d0 = q.get()
-            else:
-                d0 = None
-            d1 = distances[i]
-            q.put(d1)
+            # q = self.hist_dist[i]
+            # if q.qsize() == q.maxsize:
+            #     d0 = q.get()
+            # else:
+            #     d0 = None
+            # d1 = distances[i]
+            # q.put(d1)
             
-            if d0 is not None and d1 - d0 < self.stop_distance_eps: 
-                # check whether it stops for a long time intentionally
-                # print('stopping', taxi)
-                stops = self.k.kernel_api.vehicle.getStops(taxi, limit=1)
-                if len(stops) > 0:
-                    next_stop = stops[0]
-                    if self._is_blocking(next_stop, taxi):
-                        print(taxi, 'is blocking')
-                        edge_id = self.edges.index(self.k.vehicle.get_edge(taxi))
-                        self.action_mask[i][self.num_taxi + 1 + edge_id] = True
+            # if d0 is not None and d1 - d0 < self.stop_distance_eps: 
+            #     # check whether it stops for a long time intentionally
+            #     # print('stopping', taxi)
+            #     stops = self.k.kernel_api.vehicle.getStops(taxi, limit=1)
+            #     if len(stops) > 0:
+            #         next_stop = stops[0]
+            #         if _is_blocking(next_stop, taxi):
+            #             print(taxi, 'is blocking')
+            #             edge_id = self.edges.index(self.k.vehicle.get_edge(taxi))
+            #             self.action_mask[i][self.num_taxi + 1 + edge_id] = True
+
+            cur_edge = self.k.vehicle.get_edge(taxi)
+            assert cur_edge != ""
+            if cur_edge in self.edges:
+                edge_id = self.edges.index(cur_edge)
+                self.action_mask[i][self.num_taxi + 1 + edge_id] = True
 
             # if taxi in unavailable:
             #     self.action_mask[self.num_taxi][i] = True
@@ -427,7 +454,7 @@ class DispatchAndRepositionEnv(Env):
             edge_id2 = np.random.choice(edge_list)
 
             per_id = 'per_' + str(idx)
-            pos = np.random.uniform(self.inner_length)
+            pos = np.random.uniform(20, self.inner_length - 20)
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         elif self.distribution == 'mode-1': 
             # the request only appears at one edge
@@ -445,12 +472,12 @@ class DispatchAndRepositionEnv(Env):
             idx = self.k.person.total
             edge_list = self.edges.copy()
             rn =  np.random.rand()
-            edge_id1 = 'bot3_1_0' if rn < 0.5 else 'bot0_3_0'
+            edge_id1 = 'bot3_1_0' if rn < 0.5 else 'top0_3_0'
             edge_list.remove(edge_id1)
-            edge_id2 = 'top2_1_0' if rn < 0.5 else 'top1_3_0'
+            edge_id2 = 'top2_2_0' if rn < 0.5 else 'bot1_2_0'
 
             per_id = 'per_' + str(idx)
-            pos = np.random.uniform(self.inner_length)
+            pos = np.random.uniform(20, self.inner_length - 20)
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         elif self.distribution == 'mode-3':
             # the request appears at one edge before half of the time
