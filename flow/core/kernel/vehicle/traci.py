@@ -1251,6 +1251,7 @@ class TraCIVehicle(KernelVehicle):
     
     def checkpoint(self, veh_id):
         cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
+        assert cur_edge == self.mid_edges[veh_id][0]
         self.mid_edges[veh_id].pop(0)
         to_edge = self.reservation[veh_id].toEdge if len(self.mid_edges[veh_id]) == 0 \
             else self.mid_edges[veh_id][0]

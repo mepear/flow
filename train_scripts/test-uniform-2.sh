@@ -1,6 +1,6 @@
 python train/train.py \
-    test-uniform \
-    --experiment-name=test-uniform \
+    test-uniform-2 \
+    --experiment-name=test-uniform-2 \
     --num-env-steps=50000000 \
     --algo=ppo \
     --use-gae \
