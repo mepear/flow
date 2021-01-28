@@ -38,15 +38,15 @@ def eval_ppo(flow_params=None):
     torch.set_num_threads(1)
     device = torch.device("cuda:0" if args.cuda else "cpu")
 
-    envs = make_vec_envs(args.env_name, args.seed, args.num_processes,
-                        args.gamma, args.log_dir, device, False, flow_params=flow_params)
-
     save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
     pt =  os.path.join(save_path, str(args.eval_ckpt) + ".pt")
     actor_critic, ob_rms = torch.load(pt, map_location='cpu')
     actor_critic.to(device)
 
+    screenshot_path = os.path.join(save_path, "images") if args.save_screenshot else None
+
     flow_params['sim'].render = True
+    flow_params['sim'].save_render = screenshot_path
     evaluate(actor_critic, ob_rms, args.env_name, args.seed,
                 args.num_processes, eval_log_dir, device, flow_params)
 

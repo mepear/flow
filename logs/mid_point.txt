@@ -1,0 +1,7 @@
+1. change target: test-uniform-another
+2. increase gamma to 0.999: test-uniform
+2.1 longer step (2 sec): test-uniform-longer
+2.2 more background cars with a mid point: test-uniform-dense
+2.3 more background cars without mid point: test-uniform-dense-2
+2.4 feed information of traffic lights:  test-uniform-tl
+2.5 higher penalty for on-service time: test-uniform-high

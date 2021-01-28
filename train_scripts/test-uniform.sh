@@ -15,4 +15,4 @@ python train/train.py \
     --eval-interval=20 \
     --use-linear-lr-decay \
     --popart-reward \
-    --entropy-coef=0.01 
+    --entropy-coef=0.01

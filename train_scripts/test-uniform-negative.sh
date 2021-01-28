@@ -1,6 +1,6 @@
 python train/train.py \
-    test-uniform-2 \
-    --experiment-name=test-uniform-2 \
+    test-uniform-negative \
+    --experiment-name=test-uniform-negative \
     --num-env-steps=50000000 \
     --algo=ppo \
     --use-gae \
@@ -15,4 +15,5 @@ python train/train.py \
     --eval-interval=20 \
     --use-linear-lr-decay \
     --popart-reward \
-    --entropy-coef=0.01
+    --entropy-coef=0.01 \
+    --gamma=0.999

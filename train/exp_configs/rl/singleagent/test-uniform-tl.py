@@ -136,7 +136,8 @@ additional_params["person_prob"] = 0.04
 additional_params["max_waiting_time"] = 30
 additional_params["free_pickup_time"] = 0.0
 additional_params["distribution"] = 'mode-11'
-additional_params["n_mid_edge"] = 0
+additional_params["n_mid_edge"] = 1
+additional_params["use_tl"] = True
 flow_params = dict(
     # name of the experiment
     exp_tag='grid-intersection',
@@ -163,6 +164,7 @@ flow_params = dict(
 
     env=EnvParams(
         horizon=500,
+        sims_per_step=1,
         additional_params=additional_params,
     ),
 

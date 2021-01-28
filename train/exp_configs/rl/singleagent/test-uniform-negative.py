@@ -127,16 +127,17 @@ initial_config, net_params = get_non_flow_params(
     add_net_params=additional_net_params)
 
 additional_params = ADDITIONAL_ENV_PARAMS.copy()
-additional_params["time_price"] = -0.001
+additional_params["time_price"] = -0.01
 additional_params["distance_price"] = 0.00
-additional_params["pickup_price"] = 1
-additional_params["wait_penalty"] = 0
-additional_params["tle_penalty"] = 0.001
+additional_params["pickup_price"] = 0
+additional_params["miss_penalty"] = 4
+additional_params["wait_penalty"] = 0.00
+additional_params["tle_penalty"] = 0.01
 additional_params["person_prob"] = 0.04
 additional_params["max_waiting_time"] = 30
 additional_params["free_pickup_time"] = 0.0
 additional_params["distribution"] = 'mode-11'
-additional_params["n_mid_edge"] = 0
+additional_params["n_mid_edge"] = 1
 flow_params = dict(
     # name of the experiment
     exp_tag='grid-intersection',

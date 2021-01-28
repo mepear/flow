@@ -133,7 +133,7 @@ additional_params["pickup_price"] = 3
 additional_params["tle_penalty"] = 0
 additional_params["person_prob"] = 0.06
 additional_params["max_waiting_time"] = 50
-additional_params["max_pickup_time"] = 10.0
+additional_params["free_pickup_time"] = 10.0
 additional_params["distribution"] = 'mode-4'
 flow_params = dict(
     # name of the experiment

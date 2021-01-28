@@ -1,13 +1,14 @@
 import numpy as np
 import torch
 import os
+import traci
 
 from .a2c_ppo_acktr import utils
 from .a2c_ppo_acktr.envs import make_vec_envs
 
 
-def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
-             device, flow_params, save_path=None, writer=None, total_num_steps=None):
+def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir, 
+    device, flow_params, save_path=None, writer=None, total_num_steps=None):
     # flow_params['sim'].render = True
     eval_envs = make_vec_envs(env_name, seed, num_processes,
                               None, eval_log_dir, device, True, flow_params=flow_params)

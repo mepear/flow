@@ -47,7 +47,7 @@ def get_non_flow_params(enter_speed, add_net_params):
     """
     additional_init_params = {'enter_speed': enter_speed}
     initial = InitialConfig(
-        spacing='uniform', min_gap=10, additional_params=additional_init_params) # gap needs to be large enough
+        spacing='uniform', min_gap=5, additional_params=additional_init_params) # gap needs to be large enough
     net = NetParams(additional_params=add_net_params)
 
     return initial, net
@@ -69,7 +69,7 @@ vehicles.add(
         lane_change_mode="no_lc_safe",
     ),
     initial_speed=0,
-    num_vehicles=20)
+    num_vehicles=25)
 vehicles.add(
     veh_id="taxi",
     initial_speed=0,
@@ -136,7 +136,7 @@ additional_params["person_prob"] = 0.04
 additional_params["max_waiting_time"] = 30
 additional_params["free_pickup_time"] = 0.0
 additional_params["distribution"] = 'mode-11'
-additional_params["n_mid_edge"] = 0
+additional_params["n_mid_edge"] = 1
 flow_params = dict(
     # name of the experiment
     exp_tag='grid-intersection',
@@ -163,6 +163,7 @@ flow_params = dict(
 
     env=EnvParams(
         horizon=500,
+        sims_per_step=1,
         additional_params=additional_params,
     ),
 

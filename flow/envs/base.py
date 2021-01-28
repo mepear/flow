@@ -133,7 +133,7 @@ class Env(gym.Env, metaclass=ABCMeta):
         self.sim_params = deepcopy(sim_params)
         # check whether we should be rendering
         self.should_render = self.sim_params.render
-        self.sim_params.render = False
+        # self.sim_params.render = False
         time_stamp = ''.join(str(time.time()).split('.'))
         if os.environ.get("TEST_FLAG", 0):
             # 1.0 works with stress_test_start 10k times
@@ -203,6 +203,7 @@ class Env(gym.Env, metaclass=ABCMeta):
         self.setup_initial_state()
 
         # use pyglet to render the simulation
+        print('=' * 10, self.sim_params.render, self.sim_params.save_render, '=' * 10)
         if self.sim_params.render in ['gray', 'dgray', 'rgb', 'drgb']:
             save_render = self.sim_params.save_render
             sight_radius = self.sim_params.sight_radius
@@ -231,7 +232,8 @@ class Env(gym.Env, metaclass=ABCMeta):
         elif self.sim_params.render in [True, False]:
             # default to sumo-gui (if True) or sumo (if False)
             if (self.sim_params.render is True) and self.sim_params.save_render:
-                self.path = os.path.expanduser('~')+'/flow_rendering/' + self.network.name
+                self.path = self.sim_params.save_render
+                print('=' * 10, self.path, '=' * 10)
                 os.makedirs(self.path, exist_ok=True)
         else:
             raise FatalFlowError(
@@ -775,6 +777,7 @@ class Env(gym.Env, metaclass=ABCMeta):
                     self.sights_buffer.pop(0)
         elif (self.sim_params.render is True) and self.sim_params.save_render:
             # sumo-gui render
+            print('-' * 10, self.sim_params.save_render, self.time_counter, '-' * 10)
             self.k.kernel_api.gui.screenshot("View #0", self.path+"/frame_%06d.png" % self.time_counter)
 
     def pyglet_render(self):

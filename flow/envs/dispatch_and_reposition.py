@@ -25,16 +25,18 @@ ADDITIONAL_ENV_PARAMS = {
     "starting_distance": 100,
     "time_price": 0.01, # in second
     "distance_price": 0.03, # in meter
+    "miss_penalty": 0, # miss a reservation
     "wait_penalty": 0.0, # in second
     "tle_penalty": 0.005, # in second
     "person_prob": 0.03,
     "max_waiting_time": 10, # in second
-    "max_pickup_time": 20, # in second
+    "free_pickup_time": 20, # in second
     "max_stop_time": 1, # in second, intentionally waiting time
     "stop_distance_eps": 1, # in meter, a threshold to determine whether the car is stopping
     "distribution": 'random', # random, mode-1, mode-2, mode-3
     "reservation_order": 'random', # random or fifo 
     "n_mid_edge": 0, # number of mid point for an order
+    "use_tl": False, # whether using traffic light info
 }
 
 class DispatchAndRepositionEnv(Env):
@@ -54,6 +56,7 @@ class DispatchAndRepositionEnv(Env):
         self.pickup_price = env_params.additional_params['pickup_price']
         self.time_price = env_params.additional_params['time_price']
         self.distance_price = env_params.additional_params['distance_price']
+        self.miss_penalty = env_params.additional_params['miss_penalty']
         self.wait_penalty = env_params.additional_params['wait_penalty']
         self.tle_penalty = env_params.additional_params['tle_penalty']
         self.starting_distance = env_params.additional_params['starting_distance']
@@ -62,11 +65,15 @@ class DispatchAndRepositionEnv(Env):
         
         self.max_num_order = env_params.additional_params['max_num_order']
         self.max_waiting_time = env_params.additional_params['max_waiting_time']
-        self.max_pickup_time = env_params.additional_params['max_pickup_time']
+        self.free_pickup_time = env_params.additional_params['free_pickup_time']
 
         self.reservation_order = env_params.additional_params['reservation_order']
 
         self.n_mid_edge = env_params.additional_params['n_mid_edge']
+        self.use_tl = env_params.additional_params['use_tl']
+        self.tl_params = network.traffic_lights
+        self.n_tl = len(self.tl_params.get_properties())
+        self.n_phase = 4 # the default has 4 phases
 
         self.num_complete_orders = 0
         self.total_valid_distance = 0
@@ -143,21 +150,23 @@ class DispatchAndRepositionEnv(Env):
         state_box = Box(
             low=-500,
             high=500,
-            shape=( 1 + len(self.edges) + self.num_taxi * 9 + self.max_num_order * 5 + self.num_taxi + 2, )
+            shape=( 1 + len(self.edges) + self.num_taxi * 9 + \
+                int(self.use_tl) * self.n_tl * (self.n_phase + 1) + \
+                self.max_num_order * 5 + self.num_taxi + 2, )
         )
         return state_box
 
     def get_state(self):
         """See class definition."""
 
-        time_feature = [self.time_counter / self.env_params.horizon]
+        time_feature = [self.time_counter / (self.env_params.horizon * self.env_params.sims_per_step)]
 
         edges_feature = [
             self.k.kernel_api.edge.getLastStepVehicleNumber(edge) for edge in self.edges
         ]
         taxi_feature = []
         empty_taxi = self.k.vehicle.get_taxi_fleet(0)
-        occupied_taxi = self.k.vehicle.get_taxi_fleet(1) + self.k.vehicle.get_taxi_fleet(2)
+        pickup_taxi = self.k.vehicle.get_taxi_fleet(1)               
         
         for taxi in self.taxis:
             while taxi not in self.k.vehicle.get_rl_ids():
@@ -166,9 +175,35 @@ class DispatchAndRepositionEnv(Env):
             from_x, from_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[0], 0)
             to_x, to_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[-1], self.inner_length - 2)
             # cur_taxi_feature = [0, x, y, self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[0]), self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[-1])]
-            cur_taxi_feature = [0, 0, 0, x, y, from_x, from_y, to_x, to_y]
-            cur_taxi_feature[0 if taxi in empty_taxi else 1 if taxi in occupied_taxi else 2] = 1
+            cur_taxi_feature = [0, 0, 0, x, y, from_x, from_y, to_x, to_y] # use (x, y) or edge id
+            cur_taxi_feature[0 if taxi in empty_taxi else 1 if taxi in pickup_taxi else 2] = 1
             taxi_feature += cur_taxi_feature
+
+        # use traffic light info
+        tl_feature = []
+        if self.use_tl:
+            tl = self.k.kernel_api.trafficlight
+            for tl_id in tl.getIDList():
+                phase = tl.getPhase(tl_id)
+                t_next = tl.getNextSwitch(tl_id)
+                links = tl.getControlledLinks(tl_id)
+                logic = tl.getAllProgramLogics(tl_id)[0]
+                state = tl.getRedYellowGreenState(tl_id)
+
+                ft = [0] * (len(logic.phases) + 1)
+                ft[phase] = 1
+
+                durations = [phase.duration for phase in logic.phases]
+                cur_time = self.time_counter * self.sim_params.sim_step
+                phase_time = cur_time % sum(durations)
+                for t in durations:
+                    if phase_time > t:
+                        phase_time -= t
+                    else:
+                        res_time = t - phase_time
+                        break
+                ft[-1] = res_time
+                tl_feature += ft
         
         order_feature = self._get_order_state.tolist()
     
@@ -191,7 +226,7 @@ class DispatchAndRepositionEnv(Env):
             else:
                 need_reposition_taxi_feature = index + [-1, -1]
 
-        state = time_feature + edges_feature + taxi_feature + order_feature + need_reposition_taxi_feature
+        state = time_feature + edges_feature + taxi_feature + tl_feature + order_feature + need_reposition_taxi_feature
         return np.array(state)
     
     def _get_info(self):
@@ -318,9 +353,19 @@ class DispatchAndRepositionEnv(Env):
                 reward += self.pickup_price
                 print('taxi {} pickup successfully'.format(taxi))
 
+        # miss penalty
+        persons = self.k.kernel_api.person.getIDList()
+        for person in persons:
+            if self.k.kernel_api.person.getWaitingTime(person) > self.max_waiting_time:
+                if not self.k.person.is_matched(person) and not self.k.person.is_removed(person):
+                    reward -= self.miss_penalty
+                    self.k.person.remove(person)
+                    self.k.person.set_color(person, (0, 255, 255)) # Cyan
+                    print('tle request', person)
+
         # tle price
         for taxi in pickup_taxi:
-            if cur_time - self.k.vehicle.reservation[taxi].reservationTime > self.max_pickup_time:
+            if cur_time - self.k.vehicle.reservation[taxi].reservationTime > self.free_pickup_time:
                 reward -= self.tle_penalty * timestep
 
         # price about time 
@@ -361,7 +406,7 @@ class DispatchAndRepositionEnv(Env):
         self._check_route_valid()
         # self._update_action_mask()
         self._add_request()
-        self._remove_tle_request()
+        # self._remove_tle_request()
         self._check_arrived()
 
     def _check_route_valid(self):
@@ -503,6 +548,17 @@ class DispatchAndRepositionEnv(Env):
             edge_id1 = 'bot3_1_0'
             edge_list.remove(edge_id1)
             edge_id2 = 'top1_2_0'
+
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(20, self.inner_length - 20)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-12': 
+            # the request only appears at one edge
+            idx = self.k.person.total
+            edge_list = self.edges.copy()
+            edge_id1 = 'bot3_1_0'
+            edge_list.remove(edge_id1)
+            edge_id2 = 'top2_3_0'
 
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)

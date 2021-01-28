@@ -14,6 +14,9 @@ def get_args(args):
         "--eval-ckpt", default="0",  type=str
     )
     parser.add_argument(
+        "--save-screenshot", action="store_true", default=False, help='save screenshots while evaluating'
+    )
+    parser.add_argument(
         '--popart-reward', action="store_true", default=False, help='enable popart when scaling the reward'
     )
     parser.add_argument(
