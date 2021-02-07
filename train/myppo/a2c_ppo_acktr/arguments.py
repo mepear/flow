@@ -93,6 +93,11 @@ def get_args(args):
         default=16,
         help='how many training CPU processes to use (default: 16)')
     parser.add_argument(
+        '--eval-num-processes',
+        type=int,
+        default=50,
+        help='how many training CPU processes to use (default: 16)')
+    parser.add_argument(
         '--num-steps',
         type=int,
         default=5,
@@ -174,6 +179,12 @@ def get_args(args):
         type=int,
         default=128,
         help='maximum number of steps that a car can stay at the same edge'
+    )
+    parser.add_argument(
+        '--port',
+        type=int,
+        default=None,
+        help='base port of training and evaluation'
     )
     args = parser.parse_args(args) if args is not None else parser.parse_args()
 

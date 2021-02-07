@@ -21,18 +21,19 @@ from traci.exceptions import TraCIException
 
 ADDITIONAL_ENV_PARAMS = {
     "max_num_order": 10,
-    "pickup_price": 6,
+    "pickup_price": 0,
     "starting_distance": 100,
-    "time_price": 0.01, # in second
-    "distance_price": 0.03, # in meter
+    "time_price": 0.00, # in second
+    "distance_price": 0.0, # in meter
     "miss_penalty": 0, # miss a reservation
     "wait_penalty": 0.0, # in second
-    "tle_penalty": 0.005, # in second
+    "tle_penalty": 0.00, # in second
+    "exist_penalty": 0.00, # in second
     "person_prob": 0.03,
     "max_waiting_time": 10, # in second
     "free_pickup_time": 20, # in second
-    "max_stop_time": 1, # in second, intentionally waiting time
-    "stop_distance_eps": 1, # in meter, a threshold to determine whether the car is stopping
+    "max_stop_time": 1, # in second, intentionally waiting time (deprecated)
+    "stop_distance_eps": 1, # in meter, a threshold to determine whether the car is stopping (deprecated)
     "distribution": 'random', # random, mode-1, mode-2, mode-3
     "reservation_order": 'random', # random or fifo 
     "n_mid_edge": 0, # number of mid point for an order
@@ -59,6 +60,7 @@ class DispatchAndRepositionEnv(Env):
         self.miss_penalty = env_params.additional_params['miss_penalty']
         self.wait_penalty = env_params.additional_params['wait_penalty']
         self.tle_penalty = env_params.additional_params['tle_penalty']
+        self.exist_penalty = env_params.additional_params['exist_penalty']
         self.starting_distance = env_params.additional_params['starting_distance']
 
         self.person_prob = env_params.additional_params['person_prob']
@@ -115,12 +117,14 @@ class DispatchAndRepositionEnv(Env):
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
 
     def get_action_mask(self):
+        mask = torch.zeros_like(self.action_mask[0])
         if self.__need_reposition:
             taxi_id = self.taxis.index(self.__need_reposition)
             # print(self.action_mask[taxi_id].unsqueeze(0))
-            return self.action_mask[taxi_id].unsqueeze(0)
-        else:
-            return self.action_mask[self.num_taxi].unsqueeze(0)
+            mask = torch.logical_or(mask, self.action_mask[taxi_id])
+        if len(self.__reservations) > 0:
+            mask = torch.logical_or(mask, self.action_mask[self.num_taxi])
+        return mask.unsqueeze(0)
 
     @property
     def action_space(self):
@@ -208,23 +212,23 @@ class DispatchAndRepositionEnv(Env):
         order_feature = self._get_order_state.tolist()
     
         index = [0] * len(self.taxis)
-        if self.__reservations:
-            need_reposition_taxi_feature = index + [-1, -1]
+        # if self.__reservations:
+        #     need_reposition_taxi_feature = index + [-1, -1]
+        # else:
+        empty_taxi_fleet = self.k.vehicle.get_taxi_fleet(0)
+        self.__need_reposition = None
+        for taxi in empty_taxi_fleet:
+            if self.k.kernel_api.vehicle.isStopped(taxi):
+                self.__need_reposition = taxi
+                break
+        
+        if self.__need_reposition:
+            # need_reposition_taxi_feature = [self.edges.index(self.k.kernel_api.vehicle.getRoadID(self.__need_reposition)), self.k.vehicle.get_position(self.__need_reposition)]
+            x, y = self.k.vehicle.get_2d_position(self.__need_reposition, error=(-1, -1))
+            index[self.taxis.index(self.__need_reposition)] = 1
+            need_reposition_taxi_feature = index + [x, y]
         else:
-            empty_taxi_fleet = self.k.vehicle.get_taxi_fleet(0)
-            self.__need_reposition = None
-            for taxi in empty_taxi_fleet:
-                if self.k.kernel_api.vehicle.isStopped(taxi):
-                    self.__need_reposition = taxi
-                    break
-            
-            if self.__need_reposition:
-                # need_reposition_taxi_feature = [self.edges.index(self.k.kernel_api.vehicle.getRoadID(self.__need_reposition)), self.k.vehicle.get_position(self.__need_reposition)]
-                x, y = self.k.vehicle.get_2d_position(self.__need_reposition, error=(-1, -1))
-                index[self.taxis.index(self.__need_reposition)] = 1
-                need_reposition_taxi_feature = index + [x, y]
-            else:
-                need_reposition_taxi_feature = index + [-1, -1]
+            need_reposition_taxi_feature = index + [-1, -1]
 
         state = time_feature + edges_feature + taxi_feature + tl_feature + order_feature + need_reposition_taxi_feature
         return np.array(state)
@@ -300,16 +304,15 @@ class DispatchAndRepositionEnv(Env):
             return
         print(self.time_counter)
         if self.__need_reposition:
-            # taxi = self.__need_reposition
-            # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
-            # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
-            self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
-            print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
-            self.__need_reposition = None
-        elif self.__reservations:
-            if rl_actions[1] == self.num_taxi: # do not dispatch when the special action is selected
-                pass
-            else:
+            if rl_actions[1] == self.num_taxi or self.taxis[rl_actions[1]] != self.__need_reposition:
+                # taxi = self.__need_reposition
+                # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
+                # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
+                self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
+                print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
+                self.__need_reposition = None
+        if self.__reservations:
+            if rl_actions[1] < self.num_taxi: # do not dispatch when the special action is selected
                 # check if the dispatch is valid
                 # cur_taxi = self.taxis[rl_actions[0]]
                 # cur_edge = self.k.vehicle.get_edge(cur_taxi)
@@ -318,8 +321,6 @@ class DispatchAndRepositionEnv(Env):
                 # if not (cur_edge == cur_res.fromEdge and cur_pos > cur_res.departPos):
                 mid_edges = [self.edges[edge_id] for edge_id in rl_actions[2:]]
                 self.__pending_orders.append([self.__reservations[0], self.taxis[rl_actions[1]], mid_edges]) # notice that we may dispach a order to a occupied_taxi
-        else:
-            pass    # nothing to do 
         self._dispatch_taxi()
 
     def compute_reward(self, rl_actions, **kwargs):
@@ -338,11 +339,19 @@ class DispatchAndRepositionEnv(Env):
                     num_congestion += 1
         self.total_congestion_rate += num_congestion / len(self.edges)
 
+        pre_reward = reward
         for person in self.k.person.get_ids():
-            if self.k.person.is_matched(person) or self.k.person.is_removed(person):
-                continue
-            reward -= self.wait_penalty * timestep
-            self.total_wait_time += timestep
+            if not self.k.person.is_matched(person) and not self.k.person.is_removed(person):
+                reward -= self.wait_penalty * timestep
+                self.total_wait_time += timestep
+
+        print('-' * 10, 'un wait', [idx for idx in self.k.person.get_ids() if self.k.person.is_matched(idx) or self.k.person.is_removed(idx)])
+        print('-' * 10, 'waiting', [idx for idx in self.k.person.get_ids() if not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
+        print('-' * 10, reward - pre_reward)
+
+        for person in self.k.person.get_ids():
+            if not self.k.person.is_removed(person):
+                reward -= self.exist_penalty * timestep
 
         # pickup price  
         for i, taxi in enumerate(self.taxis):

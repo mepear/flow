@@ -139,7 +139,8 @@ class Env(gym.Env, metaclass=ABCMeta):
             # 1.0 works with stress_test_start 10k times
             time.sleep(1.0 * int(time_stamp[-6:]) / 1e6)
         # FIXME: this is sumo-specific
-        self.sim_params.port = sumolib.miscutils.getFreeSocketPort()
+        if self.sim_params.port is None:
+            self.sim_params.port = sumolib.miscutils.getFreeSocketPort()
         # time_counter: number of steps taken since the start of a rollout
         self.time_counter = 0
         # step_counter: number of total steps taken
@@ -203,7 +204,7 @@ class Env(gym.Env, metaclass=ABCMeta):
         self.setup_initial_state()
 
         # use pyglet to render the simulation
-        print('=' * 10, self.sim_params.render, self.sim_params.save_render, '=' * 10)
+        # print('=' * 10, self.sim_params.render, self.sim_params.save_render, '=' * 10)
         if self.sim_params.render in ['gray', 'dgray', 'rgb', 'drgb']:
             save_render = self.sim_params.save_render
             sight_radius = self.sim_params.sight_radius
@@ -233,7 +234,7 @@ class Env(gym.Env, metaclass=ABCMeta):
             # default to sumo-gui (if True) or sumo (if False)
             if (self.sim_params.render is True) and self.sim_params.save_render:
                 self.path = self.sim_params.save_render
-                print('=' * 10, self.path, '=' * 10)
+                # print('=' * 10, self.path, '=' * 10)
                 os.makedirs(self.path, exist_ok=True)
         else:
             raise FatalFlowError(
@@ -777,7 +778,7 @@ class Env(gym.Env, metaclass=ABCMeta):
                     self.sights_buffer.pop(0)
         elif (self.sim_params.render is True) and self.sim_params.save_render:
             # sumo-gui render
-            print('-' * 10, self.sim_params.save_render, self.time_counter, '-' * 10)
+            # print('-' * 10, self.sim_params.save_render, self.time_counter, '-' * 10)
             self.k.kernel_api.gui.screenshot("View #0", self.path+"/frame_%06d.png" % self.time_counter)
 
     def pyglet_render(self):

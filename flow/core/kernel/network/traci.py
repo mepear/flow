@@ -747,7 +747,7 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
                     add.append(e)
 
         printxml(add, self.cfg_path + self.addfn)
-        print('add.xml', self.cfg_path + self.addfn)
+        # print('add.xml', self.cfg_path + self.addfn)
 
         # this is the data that we will pass to the *.gui.cfg file
         gui = E('viewsettings')

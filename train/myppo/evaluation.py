@@ -8,10 +8,10 @@ from .a2c_ppo_acktr.envs import make_vec_envs
 
 
 def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir, 
-    device, flow_params, save_path=None, writer=None, total_num_steps=None):
+    device, flow_params, save_path=None, writer=None, total_num_steps=None, port=None):
     # flow_params['sim'].render = True
     eval_envs = make_vec_envs(env_name, seed, num_processes,
-                              None, eval_log_dir, device, True, flow_params=flow_params)
+                              None, eval_log_dir, device, True, flow_params=flow_params, port=port)
 
     vec_norm = utils.get_vec_normalize(eval_envs)
     if vec_norm is not None:
@@ -34,14 +34,17 @@ def evaluate(actor_critic, ob_rms, env_name, seed, num_processes, eval_log_dir,
         num_processes, actor_critic.recurrent_hidden_state_size, device=device)
     eval_masks = torch.zeros(num_processes, 1, device=device)
     action_mask = None
+    values = []
     while len(eval_episode_rewards) < num_processes:
         with torch.no_grad():
-            _, action, _, eval_recurrent_hidden_states = actor_critic.act(
+            value, action, _, eval_recurrent_hidden_states = actor_critic.act(
                 obs,
                 eval_recurrent_hidden_states,
                 eval_masks,
                 action_mask=action_mask,
                 deterministic=True)
+        
+        values.append(value) # To be used
 
         # Obser reward and next obs
         obs, _, done, infos = eval_envs.step(action)

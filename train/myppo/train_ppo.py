@@ -51,7 +51,7 @@ def train_ppo(flow_params=None):
     device = torch.device("cuda:0" if args.cuda else "cpu")
 
     envs = make_vec_envs(args.env_name, args.seed, args.num_processes,
-                        args.gamma, args.log_dir, device, False, popart_reward=args.popart_reward, flow_params=flow_params, reward_scale=args.reward_scale)
+                        args.gamma, args.log_dir, device, False, port=args.port, popart_reward=args.popart_reward, flow_params=flow_params, reward_scale=args.reward_scale)
 
     actor_critic = Policy(
         envs.observation_space.shape,
@@ -320,11 +320,13 @@ def train_ppo(flow_params=None):
             # save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
             total_num_steps = (j + 1) * args.num_processes * args.num_steps
             ob_rms = utils.get_vec_normalize(envs).ob_rms
-            try:
-                evaluate(actor_critic, ob_rms, args.env_name, args.seed,
-                        8, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
-            except:
-                pass
+            if args.port is not None:
+                evaluate(actor_critic, ob_rms, args.env_name, args.seed, \
+                    args.eval_num_processes, eval_log_dir, device, flow_params, save_path, writer, total_num_steps, port=args.port + args.num_processes)
+            else:
+                evaluate(actor_critic, ob_rms, args.env_name, args.seed, \
+                    args.eval_num_processes, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
+            
 
 
 if __name__ == "__main__":

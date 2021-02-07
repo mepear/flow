@@ -1297,4 +1297,4 @@ class TraCIVehicle(KernelVehicle):
             return
         self.kernel_api.vehicle.resume(veh_id)
         self.kernel_api.vehicle.changeTarget(veh_id, edge_id)
-        self.kernel_api.vehicle.setStop(veh_id, edge_id, 10, 0)
+        self.kernel_api.vehicle.setStop(veh_id, edge_id, 25, 0)

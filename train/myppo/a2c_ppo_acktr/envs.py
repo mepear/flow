@@ -16,6 +16,8 @@ from baselines.common.vec_env.shmem_vec_env import ShmemVecEnv
 from baselines.common.vec_env.vec_normalize import \
     VecNormalize as VecNormalize_
 
+from exclusiveprocess import Lock, CannotAcquireLock
+
 try:
     import dm_control2gym
 except ImportError:
@@ -82,43 +84,52 @@ def make_vec_envs(env_name,
                   log_dir,
                   device,
                   allow_early_resets,
+                  port=None,
                   num_frame_stack=None,
                   popart_reward=False,
                   flow_params=None,
                   reward_scale=None):
 
-    if flow_params is None:
-        envs = [
-            make_env(env_name, seed, i, log_dir, allow_early_resets)
-            for i in range(num_processes)
-        ]
-    else:
-        envs = []
-        for i in range(num_processes):
-            env_params = copy.deepcopy(flow_params)
-            env_params['sim'].seed = seed
-            envs.append(env_constructor(params=env_params, version=i, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale))
+    while True:
+        try:
+            with Lock(name='make_vec_envs'):
+                if flow_params is None:
+                    envs = [
+                        make_env(env_name, seed, i, log_dir, allow_early_resets)
+                        for i in range(num_processes)
+                    ]
+                else:
+                    envs = []
+                    for i in range(num_processes):
+                        env_params = copy.deepcopy(flow_params)
+                        env_params['sim'].seed = seed
+                        if port is not None:
+                            envs.append(env_constructor(params=env_params, version=i, port=port + i, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale))
+                        else:
+                            envs.append(env_constructor(params=env_params, version=i, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale))
 
-    if len(envs) > 1:
-        # envs = ShmemVecEnv(envs, context='fork')
-        envs= ShmemVecEnv(envs)
-    else:
-        envs = DummyVecEnv(envs)
-    
-    if len(envs.observation_space.shape) == 1:
-        if gamma is None:
-            envs = VecNormalize(envs, ret=False)
-        else:
-            envs = VecNormalize(envs, gamma=gamma)
+                if len(envs) > 1:
+                    # envs = ShmemVecEnv(envs, context='fork')
+                    envs= ShmemVecEnv(envs)
+                else:
+                    envs = DummyVecEnv(envs)
+                
+                if len(envs.observation_space.shape) == 1:
+                    if gamma is None:
+                        envs = VecNormalize(envs, ret=False)
+                    else:
+                        envs = VecNormalize(envs, gamma=gamma)
 
-    envs = VecPyTorch(envs, device)
+                envs = VecPyTorch(envs, device)
 
-    if num_frame_stack is not None:
-        envs = VecPyTorchFrameStack(envs, num_frame_stack, device)
-    elif len(envs.observation_space.shape) == 3:
-        envs = VecPyTorchFrameStack(envs, 4, device)
+                if num_frame_stack is not None:
+                    envs = VecPyTorchFrameStack(envs, num_frame_stack, device)
+                elif len(envs.observation_space.shape) == 3:
+                    envs = VecPyTorchFrameStack(envs, 4, device)
 
-    return envs
+                return envs
+        except CannotAcquireLock:
+            print("Try again")
 
 
 # Checks whether done was caused my timit limits or not

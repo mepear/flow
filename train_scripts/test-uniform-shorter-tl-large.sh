@@ -1,13 +1,14 @@
 python train/train.py \
-    test-uniform-negative \
-    --experiment-name=test-uniform-negative \
-    --num-env-steps=500000000 \
+    test-uniform-shorter-tl-large\
+    --experiment-name=test-uniform-shorter-tl-large \
+    --num-env-steps=50000000 \
     --algo=ppo \
     --use-gae \
     --lr=2.5e-4 \
     --clip-param=0.1 \
     --value-loss-coef=0.5 \
-    --num-processes=150 \
+    --num-processes=200 \
+    --eval-num-processes=50 \
     --num-steps=500 \
     --num-mini-batch=4 \
     --log-interval=1 \
@@ -16,4 +17,4 @@ python train/train.py \
     --use-linear-lr-decay \
     --popart-reward \
     --entropy-coef=0.01 \
-    --gamma=0.999
+    --gamma=0.995

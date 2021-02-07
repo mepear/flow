@@ -1,6 +1,6 @@
 python train/train.py \
-    test-uniform-negative \
-    --experiment-name=test-uniform-negative \
+    test-uniform-negative-nomiss \
+    --experiment-name=test-uniform-negative-nomiss \
     --num-env-steps=500000000 \
     --algo=ppo \
     --use-gae \

@@ -1,7 +1,7 @@
 python train/train.py \
-    test-uniform-negative \
-    --experiment-name=test-uniform-negative \
-    --num-env-steps=500000000 \
+    test-uniform-large \
+    --experiment-name=test-uniform-large \
+    --num-env-steps=50000000 \
     --algo=ppo \
     --use-gae \
     --lr=2.5e-4 \

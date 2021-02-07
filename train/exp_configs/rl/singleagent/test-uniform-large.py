@@ -89,30 +89,30 @@ vehicles.add(
 
 tl_logic = TrafficLightParams(baseline=False)
 phases = [{
-    "duration": "5",
-    "minDur": "5",
-    "maxDur": "5",
-    "state": "GGggrrrrGGggrrrr"
+    "duration": "31",
+    "minDur": "8",
+    "maxDur": "45",
+    "state": "GrGrGrGrGrGr"
 }, {
-    "duration": "1",
-    "minDur": "1",
-    "maxDur": "1",
-    "state": "yyyyrrrryyyyrrrr"
+    "duration": "6",
+    "minDur": "3",
+    "maxDur": "6",
+    "state": "yryryryryryr"
 }, {
-    "duration": "5",
-    "minDur": "5",
-    "maxDur": "5",
-    "state": "rrrrGGggrrrrGGgg"
+    "duration": "31",
+    "minDur": "8",
+    "maxDur": "45",
+    "state": "rGrGrGrGrGrG"
 }, {
-    "duration": "1",
-    "minDur": "1",
-    "maxDur": "1",
-    "state": "rrrryyyyrrrryyyy"
+    "duration": "6",
+    "minDur": "3",
+    "maxDur": "6",
+    "state": "ryryryryryry"
 }]
-tl_logic.add("center9", phases=phases)
-tl_logic.add("center10", phases=phases)
-tl_logic.add("center5", phases=phases)
-tl_logic.add("center6", phases=phases)
+tl_logic.add("center9")
+tl_logic.add("center10")
+tl_logic.add("center5")
+tl_logic.add("center6")
 
 additional_net_params = {
     "grid_array": grid_array,
@@ -127,12 +127,11 @@ initial_config, net_params = get_non_flow_params(
     add_net_params=additional_net_params)
 
 additional_params = ADDITIONAL_ENV_PARAMS.copy()
-additional_params["time_price"] = -0.001
+additional_params["time_price"] = -0.005
 additional_params["distance_price"] = 0.00
-additional_params["pickup_price"] = 0
-additional_params["miss_penalty"] = 1
-additional_params["wait_penalty"] = 0.001
-additional_params["tle_penalty"] = 0.001
+additional_params["pickup_price"] = 1
+additional_params["wait_penalty"] = 0
+additional_params["tle_penalty"] = 0.005
 additional_params["person_prob"] = 0.04
 additional_params["max_waiting_time"] = 30
 additional_params["free_pickup_time"] = 0.0

@@ -202,7 +202,7 @@ class RewardScaling(gym.Wrapper):
         super().close()
 
 
-def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None):
+def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None, port=None):
     """Create a parametrized flow environment compatible with OpenAI gym.
 
     This environment creation method allows for the specification of several
@@ -286,6 +286,7 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
 
     def create_env(*_):
         sim_params = deepcopy(params['sim'])
+        sim_params.port = port
         vehicles = deepcopy(params['veh'])
         # print(params['per'])
         persons = deepcopy(params.get('per', PersonParams()))
@@ -335,7 +336,7 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
     return create_env, env_name
 
 
-def env_constructor(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None):
+def env_constructor(params, version=0, render=None, port=None, popart_reward=False, gamma=0.99, reward_scale=None):
     """Return a constructor from make_create_env."""
-    create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, reward_scale)
+    create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, reward_scale, port)
     return create_env
