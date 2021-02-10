@@ -67,7 +67,7 @@ class MinicityRouter(BaseRouter):
             next_route = None
         elif veh_route[-1] == veh_edge:
             random_route = random.randint(0, len(veh_next_edge) - 1)
-            # print('veh_id', veh_id, 'veh_edge', veh_edge, 'veh_route', veh_route, 'veh_next_edge', veh_next_edge)
+            print('veh_id', veh_id, 'veh_edge', veh_edge, 'veh_route', veh_route, 'veh_next_edge', veh_next_edge)
             while veh_next_edge[0][0][0] == not_an_edge:
                 veh_next_edge = env.k.network.next_edge(
                     veh_next_edge[random_route][0],

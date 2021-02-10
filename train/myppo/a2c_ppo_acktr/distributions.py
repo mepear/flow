@@ -95,7 +95,7 @@ class FixedMultiCategorical:
         )
 
     def mode(self):
-        print('=' * 10, [torch.max(dist.probs, dim=1)[0] for dist in self.distributions])
+        # print('=' * 10, [torch.max(dist.probs, dim=1)[0] for dist in self.distributions])
         return torch.stack(
             [torch.argmax(dist.probs, dim=1) for dist in self.distributions], dim=1
         )

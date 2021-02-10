@@ -4,7 +4,7 @@ import os
 
 PYTHON_COMMAND = "python"
 
-SUMO_SLEEP = 1.0  # Delay between initializing SUMO and connecting with TraCI
+SUMO_SLEEP = 5.0  # Delay between initializing SUMO and connecting with TraCI
 
 PROJECT_PATH = osp.abspath(osp.join(osp.dirname(__file__), '..'))
 
