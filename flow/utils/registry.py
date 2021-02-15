@@ -202,7 +202,7 @@ class RewardScaling(gym.Wrapper):
         super().close()
 
 
-def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None, port=None):
+def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None, port=None, verbose=False):
     """Create a parametrized flow environment compatible with OpenAI gym.
 
     This environment creation method allows for the specification of several
@@ -253,7 +253,7 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
         name of the created gym environment
     """
 
-    print('We are in registry_with_person now.')  # TEST: this info should be printed if experiment uses this function
+    # print('We are in registry_with_person now.')  # TEST: this info should be printed if experiment uses this function
 
     exp_tag = params["exp_tag"]
 
@@ -283,6 +283,8 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
     net_params = params['net']
     initial_config = params.get('initial', InitialConfig())
     traffic_lights = params.get("tls", TrafficLightParams())
+
+    env_params.verbose = verbose
 
     def create_env(*_):
         sim_params = deepcopy(params['sim'])
@@ -336,7 +338,7 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
     return create_env, env_name
 
 
-def env_constructor(params, version=0, render=None, port=None, popart_reward=False, gamma=0.99, reward_scale=None):
+def env_constructor(params, version=0, render=None, port=None, verbose=False, popart_reward=False, gamma=0.99, reward_scale=None):
     """Return a constructor from make_create_env."""
-    create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, reward_scale, port)
+    create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, reward_scale, port, verbose)
     return create_env

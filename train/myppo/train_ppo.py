@@ -50,8 +50,11 @@ def train_ppo(flow_params=None):
     torch.set_num_threads(1)
     device = torch.device("cuda:0" if args.cuda else "cpu")
 
-    envs = make_vec_envs(args.env_name, args.seed, args.num_processes,
-                        args.gamma, args.log_dir, device, False, port=args.port, popart_reward=args.popart_reward, flow_params=flow_params, reward_scale=args.reward_scale)
+    envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
+                        args.gamma, args.log_dir, device, False, \
+                        port=args.port, popart_reward=args.popart_reward, \
+                        flow_params=flow_params, reward_scale=args.reward_scale, \
+                        verbose=args.verbose)
 
     actor_critic = Policy(
         envs.observation_space.shape,

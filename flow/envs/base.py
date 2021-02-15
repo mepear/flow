@@ -242,6 +242,7 @@ class Env(gym.Env, metaclass=ABCMeta):
         atexit.register(self.terminate)
     
     def restart_simulation_v2(self, sim_params):
+        # print('restart simu v2')
         self.k.close()
         if self.simulator == 'traci':
             self.k.simulation.sumo_proc.kill()
@@ -259,6 +260,7 @@ class Env(gym.Env, metaclass=ABCMeta):
 
 
     def restart_simulation(self, sim_params, render=None):
+        # print('restart simu v1')
         """Restart an already initialized simulation instance.
 
         This is used when visualizing a rollout, in order to update the

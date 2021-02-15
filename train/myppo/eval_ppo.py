@@ -48,5 +48,5 @@ def eval_ppo(flow_params=None):
     flow_params['sim'].render = True
     flow_params['sim'].save_render = screenshot_path
     evaluate(actor_critic, ob_rms, args.env_name, args.seed,
-                args.num_processes, eval_log_dir, device, flow_params)
+                args.num_processes, eval_log_dir, device, flow_params, verbose=True)
 

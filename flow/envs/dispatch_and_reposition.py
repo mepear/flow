@@ -77,6 +77,8 @@ class DispatchAndRepositionEnv(Env):
         self.n_tl = len(self.tl_params.get_properties())
         self.n_phase = 4 # the default has 4 phases
 
+        self.verbose = env_params.verbose
+
         self.num_complete_orders = 0
         self.total_valid_distance = 0
         self.total_valid_time = 0
@@ -88,7 +90,7 @@ class DispatchAndRepositionEnv(Env):
         self.stop_distance_eps = env_params.additional_params['stop_distance_eps']
         
         self.distribution = env_params.additional_params['distribution']
-        print(self.distribution)
+        # print(self.distribution)
         super().__init__(env_params, sim_params, network, simulator)
 
         # Saving env variables for plotting
@@ -318,14 +320,16 @@ class DispatchAndRepositionEnv(Env):
         """See class definition."""
         if self.env_params.sims_per_step > 1 and self.time_counter % self.env_params.sims_per_step != 1:
             return
-        print(self.time_counter)
+        if self.verbose:
+            print(self.time_counter)
         if self.__need_reposition:
             if rl_actions[1] == self.num_taxi or self.taxis[rl_actions[1]] != self.__need_reposition:
                 # taxi = self.__need_reposition
                 # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
                 # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
                 self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
-                print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
+                if self.verbose:
+                    print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
                 self.__need_reposition = None
         if self.__reservations:
             if rl_actions[1] < self.num_taxi: # do not dispatch when the special action is selected
@@ -341,7 +345,8 @@ class DispatchAndRepositionEnv(Env):
             self.k.vehicle.pickup(self.__need_mid_edge, mid_edges)
             res = self.k.vehicle.reservation[self.__need_mid_edge]
             self.k.person.set_color(res.persons[0], (255, 255, 255)) # White
-            print('arrange mid edges', mid_edges, 'for', res, 'on', self.__need_mid_edge)
+            if self.verbose:
+                print('arrange mid edges', mid_edges, 'for', res, 'on', self.__need_mid_edge)
             self.__need_mid_edge = None
 
         self._dispatch_taxi()
@@ -368,9 +373,10 @@ class DispatchAndRepositionEnv(Env):
                 reward -= self.wait_penalty * timestep
                 self.total_wait_time += timestep
 
-        print('-' * 10, 'un wait', [idx for idx in self.k.person.get_ids() if self.k.person.is_matched(idx) or self.k.person.is_removed(idx)])
-        print('-' * 10, 'waiting', [idx for idx in self.k.person.get_ids() if not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
-        print('-' * 10, reward - pre_reward)
+        if self.verbose:
+            print('-' * 10, 'un wait', [idx for idx in self.k.person.get_ids() if self.k.person.is_matched(idx) or self.k.person.is_removed(idx)])
+            print('-' * 10, 'waiting', [idx for idx in self.k.person.get_ids() if not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
+            print('-' * 10, reward - pre_reward)
 
         for person in self.k.person.get_ids():
             if not self.k.person.is_removed(person):
@@ -383,7 +389,8 @@ class DispatchAndRepositionEnv(Env):
                 self.taxi_states[taxi]['pickup_distance'] = distances[i]
                 self.taxi_states[taxi]['empty'] = False
                 reward += self.pickup_price
-                print('taxi {} pickup successfully'.format(taxi))
+                if self.verbose:
+                    print('taxi {} pickup successfully'.format(taxi))
 
         # miss penalty
         persons = self.k.kernel_api.person.getIDList()
@@ -393,7 +400,8 @@ class DispatchAndRepositionEnv(Env):
                     reward -= self.miss_penalty
                     self.k.person.remove(person)
                     self.k.person.set_color(person, (0, 255, 255)) # Cyan
-                    print('tle request', person)
+                    if self.verbose:
+                        print('tle request', person)
 
         # tle price
         for taxi in pickup_taxi:
@@ -612,7 +620,7 @@ class DispatchAndRepositionEnv(Env):
             rn =  np.random.rand()
             edge_id1 = 'bot3_1_0' if rn < 0.5 else 'top0_3_0'
             edge_list.remove(edge_id1)
-            edge_id2 = 'top2_2_0' if rn < 0.5 else 'bot1_2_0'
+            edge_id2 = 'top2_3_0' if rn < 0.5 else 'bot1_1_0'
 
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)
@@ -664,7 +672,8 @@ class DispatchAndRepositionEnv(Env):
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         else:
             raise NotImplementedError
-        print('add request from', edge_id1, 'to', edge_id2, 'total', self.k.person.total)
+        if self.verbose:
+            print('add request from', edge_id1, 'to', edge_id2, 'total', self.k.person.total)
 
 
     def _remove_tle_request(self):
@@ -674,7 +683,8 @@ class DispatchAndRepositionEnv(Env):
                 if not self.k.person.is_matched(person) and not self.k.person.is_removed(person):
                     self.k.person.remove(person)
                     self.k.person.set_color(person, (0, 255, 255)) # Cyan
-                    print('tle request', person)
+                    if self.verbose:
+                        print('tle request', person)
 
     
     def _dispatch_taxi(self):
@@ -689,8 +699,10 @@ class DispatchAndRepositionEnv(Env):
                 self.__dispatched_orders.append((res, veh_id))
                 self.k.vehicle.dispatch_taxi(veh_id, res)
                 self.k.person.match(res.persons[0], veh_id)
-                print('dispatch {} to {}, remaining {} available taxis, cur_edge {}, cur_route {}'.format(\
-                    res, veh_id, len(self.k.vehicle.get_taxi_fleet(0)), self.k.vehicle.get_edge(veh_id), self.k.vehicle.get_route(veh_id)))
+                if self.verbose:
+                    print('dispatch {} to {}, remaining {} available taxis, cur_edge {}, cur_route {}'.format(\
+                        res, veh_id, len(self.k.vehicle.get_taxi_fleet(0)), self.k.vehicle.get_edge(veh_id), self.k.vehicle.get_route(veh_id)))
             else:
-                print('order {} dispatch tle'.format(res))
+                if self.verbose:
+                    print('order {} dispatch tle'.format(res))
         self.__pending_orders = remain_pending_orders

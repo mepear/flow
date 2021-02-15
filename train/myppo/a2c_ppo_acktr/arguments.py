@@ -186,6 +186,12 @@ def get_args(args):
         default=None,
         help='base port of training and evaluation'
     )
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        default=False,
+        help='whether to print the intermediate outputs'
+    )
     args = parser.parse_args(args) if args is not None else parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()

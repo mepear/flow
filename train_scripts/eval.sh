@@ -1,5 +1,6 @@
-python train/eval_myppo.py test-uniform-shorter-tl-nowait-mid \
-    --experiment-name=test-stl-nw-m \
+python train/eval_myppo.py test-mtl-nw-m-utl \
+    --experiment-name=test-mtl-nw-m-utl \
     --algo=ppo \
     --num-processes=1 \
-    --eval-ckpt=54
+    --verbose \
+    --eval-ckpt=118
