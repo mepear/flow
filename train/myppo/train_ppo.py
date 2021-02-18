@@ -123,6 +123,13 @@ def train_ppo(flow_params=None):
     total_wait_times = deque(maxlen=args.num_processes)
     total_congestion_rates = deque(maxlen=args.num_processes)
 
+    if args.port is not None:
+        eval_envs = make_vec_envs(args.env_name, args.seed, args.eval_num_processes, \
+            None, eval_log_dir, device, True, flow_params=flow_params, port=args.port + args.num_processes)
+    else:
+        eval_envs = make_vec_envs(args.env_name, args.seed, args.eval_num_processes, \
+            None, eval_log_dir, device, True, flow_params=flow_params)
+
     start = time.time()
     num_updates = int(
         args.num_env_steps) // args.num_steps // args.num_processes
@@ -323,12 +330,9 @@ def train_ppo(flow_params=None):
             # save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
             total_num_steps = (j + 1) * args.num_processes * args.num_steps
             ob_rms = utils.get_vec_normalize(envs).ob_rms
-            if args.port is not None:
-                evaluate(actor_critic, ob_rms, args.env_name, args.seed, \
-                    args.eval_num_processes, eval_log_dir, device, flow_params, save_path, writer, total_num_steps, port=args.port + args.num_processes)
-            else:
-                evaluate(actor_critic, ob_rms, args.env_name, args.seed, \
-                    args.eval_num_processes, eval_log_dir, device, flow_params, save_path, writer, total_num_steps)
+            evaluate(actor_critic, eval_envs, ob_rms, args.eval_num_processes, device, save_path, writer, total_num_steps)
+
+    eval_envs.close()
             
 
 

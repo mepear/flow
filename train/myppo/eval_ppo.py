@@ -47,6 +47,7 @@ def eval_ppo(flow_params=None):
 
     flow_params['sim'].render = True
     flow_params['sim'].save_render = screenshot_path
-    evaluate(actor_critic, ob_rms, args.env_name, args.seed,
-                args.num_processes, eval_log_dir, device, flow_params, verbose=True)
-
+    eval_envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
+        None, eval_log_dir, device, True, flow_params=flow_params, verbose=True)
+    evaluate(actor_critic, eval_envs, ob_rms, args.num_processes, device)
+    eval_envs.close()
