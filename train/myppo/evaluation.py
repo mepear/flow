@@ -101,61 +101,63 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 },
             total_num_steps
             )
-        array = np.ma.masked_invalid(total_pickup_distances / denom)
-        writer.add_scalars(
-                "eval/pickup_distance", 
-                {
-                    "mean": np.nanmean(array), 
-                    "median": np.nanmedian(array),
-                    "max": np.nanmax(array),
-                    "min": np.nanmin(array)
-                },
-            total_num_steps
-            )
-        array = np.ma.masked_invalid(total_pickup_times / denom)
-        writer.add_scalars(
-                "eval/pickup_time", 
-                {
-                    "mean": np.nanmean(array), 
-                    "median": np.nanmedian(array),
-                    "max": np.nanmax(array),
-                    "min": np.nanmin(array)
-                },
-            total_num_steps
-            )
-        array = np.ma.masked_invalid(total_valid_distances / denom)
-        writer.add_scalars(
-                "eval/valid_distance", 
-                {
-                    "mean": np.nanmean(array), 
-                    "median": np.nanmedian(array),
-                    "max": np.nanmax(array),
-                    "min": np.nanmin(array)
-                },
-            total_num_steps
-            )
-        array = np.ma.masked_invalid(total_valid_times / denom)
-        writer.add_scalars(
-                "eval/valid_time", 
-                {
-                    "mean": np.nanmean(array), 
-                    "median": np.nanmedian(array),
-                    "max": np.nanmax(array),
-                    "min": np.nanmin(array)
-                },
-            total_num_steps
-            )
-        array = np.ma.masked_invalid(total_wait_times / denom2)
-        writer.add_scalars(
-                "eval/wait_time", 
-                {
-                    "mean": np.nanmean(array), 
-                    "median": np.nanmedian(array),
-                    "max": np.nanmax(array),
-                    "min": np.nanmin(array)
-                },
-            total_num_steps
-            )
+        if not np.alltrue(denom == 0):
+            array = np.ma.masked_invalid(total_pickup_distances / denom)
+            writer.add_scalars(
+                    "eval/pickup_distance", 
+                    {
+                        "mean": np.nanmean(array), 
+                        "median": np.nanmedian(array),
+                        "max": np.nanmax(array),
+                        "min": np.nanmin(array)
+                    },
+                total_num_steps
+                )
+            array = np.ma.masked_invalid(total_pickup_times / denom)
+            writer.add_scalars(
+                    "eval/pickup_time", 
+                    {
+                        "mean": np.nanmean(array), 
+                        "median": np.nanmedian(array),
+                        "max": np.nanmax(array),
+                        "min": np.nanmin(array)
+                    },
+                total_num_steps
+                )
+            array = np.ma.masked_invalid(total_valid_distances / denom)
+            writer.add_scalars(
+                    "eval/valid_distance", 
+                    {
+                        "mean": np.nanmean(array), 
+                        "median": np.nanmedian(array),
+                        "max": np.nanmax(array),
+                        "min": np.nanmin(array)
+                    },
+                total_num_steps
+                )
+            array = np.ma.masked_invalid(total_valid_times / denom)
+            writer.add_scalars(
+                    "eval/valid_time", 
+                    {
+                        "mean": np.nanmean(array), 
+                        "median": np.nanmedian(array),
+                        "max": np.nanmax(array),
+                        "min": np.nanmin(array)
+                    },
+                total_num_steps
+                )
+        if not np.alltrue(denom2 == 0):
+            array = np.ma.masked_invalid(total_wait_times / denom2)
+            writer.add_scalars(
+                    "eval/wait_time", 
+                    {
+                        "mean": np.nanmean(array), 
+                        "median": np.nanmedian(array),
+                        "max": np.nanmax(array),
+                        "min": np.nanmin(array)
+                    },
+                total_num_steps
+                )
         writer.add_scalars(
                 "eval/congestion_rate", 
                 {

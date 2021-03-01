@@ -1,6 +1,6 @@
 python train/train.py \
-    test-uniform-shorter-tl-nowait-mid \
-    --experiment-name=test-stl-nw-m \
+    test-uniform-shorter-tl-nowait-mid-0 \
+    --experiment-name=test-stl-nw-m-0 \
     --num-env-steps=100000000 \
     --algo=ppo \
     --use-gae \
