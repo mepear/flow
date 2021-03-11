@@ -6,8 +6,12 @@ import traci
 from .a2c_ppo_acktr import utils
 from .a2c_ppo_acktr.envs import make_vec_envs
 
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
 
-def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=None, writer=None, total_num_steps=None):
+def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
+    save_path=None, writer=None, total_num_steps=None, do_plot_congestion=False):
     # # flow_params['sim'].render = True
     # eval_envs = make_vec_envs(env_name, seed, num_processes,
     #                           None, eval_log_dir, device, True, flow_params=flow_params, port=port, verbose=verbose)
@@ -26,6 +30,8 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     total_valid_times = []
     total_wait_times = []
     total_congestion_rates = []
+    mean_velocities = []
+    edge_position = None
 
     obs = eval_envs.reset()
 
@@ -69,6 +75,8 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 total_valid_times.append(info['episode']['total_valid_time'])
                 total_wait_times.append(info['episode']['total_wait_time'])
                 total_congestion_rates.append(info['episode']['total_congestion_rate'])
+                mean_velocities.append(info['episode']['mean_velocity'])
+                edge_position = info['episode']['edge_position']
 
     print(" Evaluation using {} episodes: mean reward {:.5f}\n".format(
         len(eval_episode_rewards), np.mean(eval_episode_rewards)))
@@ -168,3 +176,35 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 },
             total_num_steps
             )
+    
+    if do_plot_congestion:
+        plot_congestion(mean_velocities, edge_position, save_path)
+
+
+def get_corners(s, e, w):
+    s, e = np.array(s), np.array(e)
+    se = e - s
+    p = np.array([-se[1], se[0]])
+    p = p / np.linalg.norm(p) * w / 2
+    return [s + p, e + p, e - p, s - p]
+
+
+def plot_congestion(mean_velocities, edge_position, save_path):
+    fig, ax = plt.subplots()
+    cmap = plt.get_cmap('Greys')
+    mean_vels = np.mean(mean_velocities, axis=0)
+    for vel, (start, end, width) in zip(mean_vels, edge_position):
+        vertices = get_corners(start, end, width)
+        assert vel > 0 and vel <= 1
+        poly = Polygon(vertices, color=cmap(1 - vel))
+        ax.add_patch(poly)
+    plt.xlim(-5., 160.)
+    plt.ylim(-5., 160.)
+    plt.savefig(os.path.join(save_path, 'congestion.jpg'), dpi=500)
+
+    fig, ax = plt.subplots()
+    plt.bar(np.arange(len(mean_vels)), np.sort(1 - mean_vels))
+    plt.ylim(0., 1.)
+    plt.savefig(os.path.join(save_path, 'distribution.jpg'), dpi=500)
+    
+

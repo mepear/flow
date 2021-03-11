@@ -127,7 +127,7 @@ initial_config, net_params = get_non_flow_params(
     add_net_params=additional_net_params)
 
 additional_params = ADDITIONAL_ENV_PARAMS.copy()
-additional_params["time_price"] = 0.01
+additional_params["time_price"] = 0.0025
 additional_params["distance_price"] = 0.0025
 additional_params["pickup_price"] = 1
 additional_params["wait_penalty"] = 0.000

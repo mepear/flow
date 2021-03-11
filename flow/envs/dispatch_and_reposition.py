@@ -107,6 +107,12 @@ class DispatchAndRepositionEnv(Env):
         assert self.num_taxi == len(self.taxis)
         self.num_vehicles = network.vehicles.num_vehicles
 
+        self.mean_velocity = np.zeros(len(self.edges))
+        self.edge_position = [(self.k.kernel_api.simulation.convert2D(edge, 0), \
+            self.k.kernel_api.simulation.convert2D(edge, self.k.kernel_api.lane.getLength(edge + '_0')), \
+            self.k.kernel_api.lane.getWidth(edge + '_0')) \
+            for edge in self.edges]
+
         self.__dispatched_orders = []
         self.__pending_orders = []
         self.__reservations = []
@@ -272,6 +278,7 @@ class DispatchAndRepositionEnv(Env):
         self.total_pickup_time = 0
         self.total_wait_time = 0
         self.total_congestion_rate = 0
+        self.mean_velocity = np.zeros(len(self.edges))
         self.stop_time = [None] * len(self.taxis)
         return observation
 
@@ -360,11 +367,15 @@ class DispatchAndRepositionEnv(Env):
         cur_time = self.time_counter * self.sim_params.sim_step
         timestep = self.sim_params.sim_step * self.env_params.sims_per_step
 
+        # collect the mean velocity of edges
         num_congestion = 0.0
-        for edge in self.edges:
-            if self.k.kernel_api.edge.getLastStepVehicleNumber(edge) > 0:
-                if self.k.kernel_api.edge.getLastStepMeanSpeed(edge) < 3.0: # a threshold for congestion
-                    num_congestion += 1
+        for i, edge in enumerate(self.edges):
+            n_veh = self.k.kernel_api.edge.getLastStepVehicleNumber(edge)
+            mean_vel = self.k.kernel_api.edge.getLastStepMeanSpeed(edge) if n_veh > 0 else 10.0 # MAX_SPEED = 10.0
+            self.mean_velocity[i] += mean_vel / 10.0 / self.env_params.horizon
+            if n_veh > 0:
+                if mean_vel < 3.0: # a threshold for congestion
+                    num_congestion += 1        
         self.total_congestion_rate += num_congestion / len(self.edges)
 
         pre_reward = reward
@@ -609,6 +620,16 @@ class DispatchAndRepositionEnv(Env):
             edge_id1 = 'bot3_1_0'
             edge_list.remove(edge_id1)
             edge_id2 = 'top2_3_0'
+
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(20, self.inner_length - 20)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-X':
+            # the request only appears at one edge
+            idx = self.k.person.total
+            rn =  np.random.rand()
+            edge_id1 = 'bot3_1_0' if rn < 0.5 else 'top3_3_0'
+            edge_id2 = 'top0_3_0' if rn < 0.5 else 'bot0_1_0'
 
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)

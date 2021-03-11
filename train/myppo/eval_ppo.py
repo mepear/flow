@@ -45,9 +45,10 @@ def eval_ppo(flow_params=None):
 
     screenshot_path = os.path.join(save_path, "images") if args.save_screenshot else None
 
-    flow_params['sim'].render = True
+    flow_params['sim'].render = not args.disable_render_during_eval
     flow_params['sim'].save_render = screenshot_path
     eval_envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
         None, eval_log_dir, device, True, flow_params=flow_params, verbose=True)
-    evaluate(actor_critic, eval_envs, ob_rms, args.num_processes, device)
+    evaluate(actor_critic, eval_envs, ob_rms, args.num_processes, device, \
+        save_path=save_path, do_plot_congestion=args.plot_congestion)
     eval_envs.close()

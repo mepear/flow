@@ -192,6 +192,17 @@ def get_args(args):
         default=False,
         help='whether to print the intermediate outputs'
     )
+    parser.add_argument(
+        '--plot-congestion',
+        action='store_true',
+        default=False,
+        help='whether to plot the congestion distribution'
+    )
+    parser.add_argument(
+        '--disable-render-during-eval',
+        action='store_true',
+        default=False,
+    )
     args = parser.parse_args(args) if args is not None else parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()
