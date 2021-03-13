@@ -691,7 +691,7 @@ class DispatchAndRepositionEnv(Env):
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         elif self.distribution == 'mode-X2':
             idx = self.k.person.total
-            t =  self.time_counter / self.sim_params.sims_per_step / self.env_params.horizon
+            t =  self.time_counter / self.env_params.sims_per_step / self.env_params.horizon
             rn = np.random.rand()
             if t < 0.5:
                 edge_id1 = 'bot3_1_0'
