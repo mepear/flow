@@ -204,7 +204,8 @@ class RewardScaling(gym.Wrapper):
         super().close()
 
 
-def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None, port=None, verbose=False):
+def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None, \
+    port=None, verbose=False, save_path=None):
     """Create a parametrized flow environment compatible with OpenAI gym.
 
     This environment creation method allows for the specification of several
@@ -308,6 +309,9 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
         # accept new render type if not set to None
         sim_params.render = render or sim_params.render
 
+        # save path
+        env_params.save_path = save_path
+
         # check if the environment is a single or multiagent environment, and
         # get the right address accordingly
         single_agent_envs = [env for env in dir(flow.envs)
@@ -340,7 +344,9 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
     return create_env, env_name
 
 
-def env_constructor(params, version=0, render=None, port=None, verbose=False, popart_reward=False, gamma=0.99, reward_scale=None):
+def env_constructor(params, version=0, render=None, port=None, verbose=False, popart_reward=False, \
+    gamma=0.99, reward_scale=None, save_path=None):
     """Return a constructor from make_create_env."""
-    create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, reward_scale, port, verbose)
+    create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, \
+        reward_scale, port, verbose, save_path)
     return create_env

@@ -51,7 +51,7 @@ def train_ppo(flow_params=None):
     device = torch.device("cuda:0" if args.cuda else "cpu")
 
     envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
-                        args.gamma, args.log_dir, device, False, \
+                        args.gamma, save_path, device, False, \
                         port=args.port, popart_reward=args.popart_reward, \
                         flow_params=flow_params, reward_scale=args.reward_scale, \
                         verbose=args.verbose)
@@ -125,10 +125,10 @@ def train_ppo(flow_params=None):
 
     if args.port is not None:
         eval_envs = make_vec_envs(args.env_name, args.seed, args.eval_num_processes, \
-            None, eval_log_dir, device, True, flow_params=flow_params, port=args.port + args.num_processes)
+            None, save_path, device, True, flow_params=flow_params, port=args.port + args.num_processes)
     else:
         eval_envs = make_vec_envs(args.env_name, args.seed, args.eval_num_processes, \
-            None, eval_log_dir, device, True, flow_params=flow_params)
+            None, save_path, device, True, flow_params=flow_params)
 
     start = time.time()
     num_updates = int(

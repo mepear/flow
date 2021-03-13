@@ -8,6 +8,8 @@ import numpy as np
 import re
 import random
 import torch
+import os
+import time
 from queue import Queue
 
 from gym.spaces.box import Box
@@ -18,6 +20,9 @@ from gym.spaces import Tuple
 from flow.core import rewards
 from flow.envs.base import Env
 from traci.exceptions import TraCIException
+
+import threading
+from exclusiveprocess import Lock, CannotAcquireLock
 
 ADDITIONAL_ENV_PARAMS = {
     "max_num_order": 10,
@@ -102,6 +107,30 @@ class DispatchAndRepositionEnv(Env):
         }
 
         self.edges = self.k.network.get_edge_list()
+        n_edge = len(self.edges)
+        save_path = os.path.join(env_params.save_path, 'preprocess.pt')
+        while True:
+            try:
+                with Lock(name='preprocess'):
+                    if os.path.exists(save_path):
+                        self.paired_routes, self.banned_mid_edges = torch.load(save_path)
+                    else:
+                        self.paired_routes = [[self.k.kernel_api.simulation.findRoute(s, t) for t in self.edges] for s in self.edges]
+                        self.banned_mid_edges = torch.zeros((n_edge, n_edge, n_edge), dtype=bool)
+                        for i in range(n_edge):
+                            for j in range(n_edge):
+                                if i != j:
+                                    for k in range(n_edge):
+                                        if k != i and k != j:
+                                            r1 = set(self.paired_routes[i][k].edges[1:-1])
+                                            r2 = set(self.paired_routes[k][j].edges[1:-1])
+                                            if len(r1 & r2) > 0:
+                                                self.banned_mid_edges[i, j, k] = True
+                        torch.save([self.paired_routes, self.banned_mid_edges], save_path)
+                break
+            except CannotAcquireLock:
+                pass
+
         self.num_taxi = network.vehicles.num_rl_vehicles
         self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi) == 'taxi']
         assert self.num_taxi == len(self.taxis)
@@ -533,9 +562,23 @@ class DispatchAndRepositionEnv(Env):
             res = self.k.vehicle.reservation[self.__need_mid_edge]
             from_id, to_id = self.edges.index(res.fromEdge), self.edges.index(res.toEdge)
             taxi_id =  self.taxis.index(self.__need_mid_edge)
+            
             for i in range(self.n_mid_edge):
                 self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + from_id] = True
                 self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + to_id] = True
+
+            if self.n_mid_edge == 0:
+                pass
+            elif self.n_mid_edge == 1:
+                # for i, edge in enumerate(self.edges):
+                #     if edge != res.fromEdge and edge != res.toEdge:
+                #         r1 = set(self.k.kernel_api.simulation.findRoute(res.fromEdge, edge).edges[1:-1])
+                #         r2 = set(self.k.kernel_api.simulation.findRoute(edge, res.toEdge).edges[1:-1])
+                #         if len(r1 & r2) > 0:
+                #             self.action_mask[taxi_id][n_edge + n_taxi + 1 + i] = True
+                self.action_mask[taxi_id][n_edge + n_taxi + 1:] |= self.banned_mid_edges[from_id, to_id]
+            else:
+                raise NotImplementedError
 
         for i, taxi in enumerate(self.taxis):
             # q = self.hist_dist[i]
@@ -631,6 +674,18 @@ class DispatchAndRepositionEnv(Env):
             edge_id1 = 'bot3_1_0' if rn < 0.5 else 'top3_3_0'
             edge_id2 = 'top0_3_0' if rn < 0.5 else 'bot0_1_0'
 
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(20, self.inner_length - 20)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-X1':
+            idx = self.k.person.total
+            rn, rn2 =  np.random.rand(), np.random.rand()
+            if rn < 0.5:
+                edge_id1 = 'bot3_1_0'
+                edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+            else:
+                edge_id1 = 'top3_3_0'
+                edge_id2 = 'left1_0_0' if rn2 < 0.5 else 'top0_1_0'
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos)

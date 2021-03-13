@@ -1274,7 +1274,7 @@ class TraCIVehicle(KernelVehicle):
     def stop(self,veh_id):
         cur_edge = self.get_edge(veh_id)
         cur_pos = self.get_position(veh_id)
-        self.kernel_api.vehicle.setStop(veh_id, cur_edge, cur_pos + 1, 0, 600)
+        self.kernel_api.vehicle.setStop(veh_id, cur_edge, cur_pos + 0.1, 0, 600)
     
     def is_free(self, veh_id):
         return veh_id in self.__free_taxis

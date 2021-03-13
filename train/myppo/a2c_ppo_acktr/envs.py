@@ -16,6 +16,7 @@ from baselines.common.vec_env.shmem_vec_env import ShmemVecEnv
 from baselines.common.vec_env.vec_normalize import \
     VecNormalize as VecNormalize_
 
+import threading
 from exclusiveprocess import Lock, CannotAcquireLock
 
 try:
@@ -81,7 +82,7 @@ def make_vec_envs(env_name,
                   seed,
                   num_processes,
                   gamma,
-                  log_dir,
+                  save_path,
                   device,
                   allow_early_resets,
                   port=None,
@@ -106,9 +107,13 @@ def make_vec_envs(env_name,
                         env_params = copy.deepcopy(flow_params)
                         env_params['sim'].seed = seed
                         if port is not None:
-                            envs.append(env_constructor(params=env_params, version=i, verbose=verbose, port=port + i, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale))
+                            envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
+                                port=port + i, popart_reward=popart_reward, gamma=gamma, \
+                                reward_scale=reward_scale, save_path=save_path))
                         else:
-                            envs.append(env_constructor(params=env_params, version=i, verbose=verbose, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale))
+                            envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
+                                popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale, \
+                                save_path=save_path))
 
                 if len(envs) > 1:
                     # envs = ShmemVecEnv(envs, context='fork')
