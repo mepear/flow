@@ -673,10 +673,11 @@ class DispatchAndRepositionEnv(Env):
             rn =  np.random.rand()
             edge_id1 = 'bot3_1_0' if rn < 0.5 else 'top3_3_0'
             edge_id2 = 'top0_3_0' if rn < 0.5 else 'bot0_1_0'
+            tp = 0 if rn < 0.5 else 1
 
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)
-            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos, tp=tp)
         elif self.distribution == 'mode-X1':
             idx = self.k.person.total
             rn, rn2 =  np.random.rand(), np.random.rand()
@@ -786,7 +787,8 @@ class DispatchAndRepositionEnv(Env):
                 remain_pending_orders.append([res, veh_id])
             elif self.k.kernel_api.person.getWaitingTime(res.persons[0]) <= self.max_waiting_time:
                 self.__dispatched_orders.append((res, veh_id))
-                self.k.vehicle.dispatch_taxi(veh_id, res)
+                print(self.k.person.get_type(res.persons[0]))
+                self.k.vehicle.dispatch_taxi(veh_id, res, tp=self.k.person.get_type(res.persons[0]))
                 self.k.person.match(res.persons[0], veh_id)
                 if self.verbose:
                     print('dispatch {} to {}, remaining {} available taxis, cur_edge {}, cur_route {}'.format(\
