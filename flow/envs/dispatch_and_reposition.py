@@ -141,6 +141,11 @@ class DispatchAndRepositionEnv(Env):
             self.k.kernel_api.simulation.convert2D(edge, self.k.kernel_api.lane.getLength(edge + '_0')), \
             self.k.kernel_api.lane.getWidth(edge + '_0')) \
             for edge in self.edges]
+        self.statistics = {
+            'route': {},
+            'location': {}
+        }
+        self.last_edge = dict([(taxi, None) for taxi in self.taxis])
 
         self.__dispatched_orders = []
         self.__pending_orders = []
@@ -309,6 +314,11 @@ class DispatchAndRepositionEnv(Env):
         self.total_congestion_rate = 0
         self.mean_velocity = np.zeros(len(self.edges))
         self.stop_time = [None] * len(self.taxis)
+        self.statistics = {
+            'route': {},
+            'location': {}
+        }
+        self.last_edge = dict([(taxi, None) for taxi in self.taxis])
         return observation
 
     @property
@@ -358,12 +368,16 @@ class DispatchAndRepositionEnv(Env):
             return
         if self.verbose:
             print(self.time_counter)
+        if 'reposition' not in self.statistics['location']:
+            self.statistics['location']['reposition'] = np.zeros(len(self.edges))
+        reposition_stat = self.statistics['location']['reposition']
         if self.__need_reposition:
             if rl_actions[1] == self.num_taxi or self.taxis[rl_actions[1]] != self.__need_reposition:
                 # taxi = self.__need_reposition
                 # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
                 # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
                 self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
+                reposition_stat[rl_actions[0]] += 1
                 if self.verbose:
                     print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
                 self.__need_reposition = None
@@ -390,11 +404,13 @@ class DispatchAndRepositionEnv(Env):
     def compute_reward(self, rl_actions, **kwargs):
         """See class definition."""
         reward = 0
+        free_taxi = self.k.vehicle.get_taxi_fleet(0)
         pickup_taxi = self.k.vehicle.get_taxi_fleet(1)
         occupied_taxi = self.k.vehicle.get_taxi_fleet(2)
         distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
         cur_time = self.time_counter * self.sim_params.sim_step
         timestep = self.sim_params.sim_step * self.env_params.sims_per_step
+        n_edge = len(self.edges)
 
         # collect the mean velocity of edges
         num_congestion = 0.0
@@ -406,6 +422,40 @@ class DispatchAndRepositionEnv(Env):
                 if mean_vel < 3.0: # a threshold for congestion
                     num_congestion += 1        
         self.total_congestion_rate += num_congestion / len(self.edges)
+
+        # collect the free vehicle density
+        if 'free' not in self.statistics['route']:
+            self.statistics['route']['free'] = np.zeros((n_edge))
+        cnt = self.statistics['route']['free']
+        for taxi in free_taxi:
+            edge = self.k.vehicle.get_edge(taxi)
+            if edge in self.edges and self.last_edge[taxi] != edge:
+                cnt[self.edges.index(edge)] += 1
+            self.last_edge[taxi] = edge
+
+        # collect the pickup vehicle density
+        if 'pickup' not in self.statistics['route']:
+            self.statistics['route']['pickup'] = \
+                np.zeros((1 if 'mode-X' not in self.distribution else 2, n_edge))
+        cnt = self.statistics['route']['pickup']
+        for taxi in pickup_taxi:
+            edge = self.k.vehicle.get_edge(taxi)
+            tp = self.k.vehicle.get_res_type(taxi)
+            if edge in self.edges and self.last_edge[taxi] != edge:
+                cnt[tp][self.edges.index(edge)] += 1
+            self.last_edge[taxi] = edge
+
+        # collect the on-service vehicle density
+        if 'occupied' not in self.statistics['route']:
+            self.statistics['route']['occupied'] = \
+                np.zeros((1 if 'mode-X' not in self.distribution else 2, n_edge))
+        cnt = self.statistics['route']['occupied']
+        for taxi in occupied_taxi:
+            edge = self.k.vehicle.get_edge(taxi)
+            tp = self.k.vehicle.get_res_type(taxi)
+            if edge in self.edges and self.last_edge[taxi] != edge:
+                cnt[tp][self.edges.index(edge)] += 1
+            self.last_edge[taxi] = edge
 
         pre_reward = reward
         for person in self.k.person.get_ids():
@@ -684,12 +734,14 @@ class DispatchAndRepositionEnv(Env):
             if rn < 0.5:
                 edge_id1 = 'bot3_1_0'
                 edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+                tp = 0
             else:
                 edge_id1 = 'top3_3_0'
                 edge_id2 = 'left1_0_0' if rn2 < 0.5 else 'top0_1_0'
+                tp = 1
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)
-            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos, tp=tp)
         elif self.distribution == 'mode-X2':
             idx = self.k.person.total
             t =  self.time_counter / self.env_params.sims_per_step / self.env_params.horizon
@@ -697,12 +749,14 @@ class DispatchAndRepositionEnv(Env):
             if t < 0.5:
                 edge_id1 = 'bot3_1_0'
                 edge_id2 = 'left1_3_0' if rn < 0.5 else 'bot0_3_0'
+                tp = 0
             else:
                 edge_id1 = 'top3_3_0'
                 edge_id2 = 'left1_0_0' if rn < 0.5 else 'top0_1_0'
+                tp = 1
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)
-            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos, tp=tp)
         elif self.distribution == 'mode-2':
             # the request only appears at two different edges
             idx = self.k.person.total
@@ -780,6 +834,9 @@ class DispatchAndRepositionEnv(Env):
     def _dispatch_taxi(self):
         remain_pending_orders = []
 
+        if 'pickup' not in self.statistics['location']:
+            self.statistics['location']['pickup'] = [[], []] if 'mode-X' in self.distribution else [[]]
+        pickup_stat = self.statistics['location']['pickup']
         for res, veh_id in self.__pending_orders:
             # there would be some problems if the a taxi is on the road started with ":"
             # if the taxi is occupied now, we should dispatch this order later
@@ -790,6 +847,7 @@ class DispatchAndRepositionEnv(Env):
                 print(self.k.person.get_type(res.persons[0]))
                 self.k.vehicle.dispatch_taxi(veh_id, res, tp=self.k.person.get_type(res.persons[0]))
                 self.k.person.match(res.persons[0], veh_id)
+                pickup_stat[self.k.vehicle.get_res_type(veh_id)].append(self.k.vehicle.get_2d_position(veh_id))
                 if self.verbose:
                     print('dispatch {} to {}, remaining {} available taxis, cur_edge {}, cur_route {}'.format(\
                         res, veh_id, len(self.k.vehicle.get_taxi_fleet(0)), self.k.vehicle.get_edge(veh_id), self.k.vehicle.get_route(veh_id)))

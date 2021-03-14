@@ -120,6 +120,7 @@ class Monitor(gym.Wrapper):
             ep_info['total_congestion_rate'] = self.env.total_congestion_rate
             ep_info['mean_velocity'] = self.env.mean_velocity
             ep_info['edge_position'] = self.env.edge_position
+            ep_info['statistics'] = self.env.statistics
             ep_info.update(self.current_reset_info)
             if self.logger:
                 self.logger.writerow(ep_info)
