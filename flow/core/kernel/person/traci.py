@@ -72,6 +72,7 @@ class TraCIPerson(KernelPerson):
         self.total = 0
         self.num_persons = 0
         self.__persons = collections.OrderedDict()
+        self.__types = {}
         self.__ids = []
         self.__reservations = []
         self.__match = {}
@@ -109,11 +110,15 @@ class TraCIPerson(KernelPerson):
     def add(self, per_id, type_id, edge, pos):
         self.kernel_api.person.add(per_id, edge, pos, typeID=type_id)
 
-    def add_request(self, per_id, edge_id1, edge_id2, pos):
+    def add_request(self, per_id, edge_id1, edge_id2, pos, tp=0):
         self.kernel_api.person.add(per_id, edge_id1, pos)
         self.kernel_api.person.appendDrivingStage(per_id, edge_id2, 'taxi')
         self.kernel_api.person.setColor(per_id, (255, 0, 0))
+        self.__types[per_id] = tp
         self.total += 1
+
+    def get_type(self, per_id):
+        return self.__types[per_id]
 
     def match(self, per_id, veh_id):
         self.__match[per_id] = veh_id
@@ -144,10 +149,6 @@ class TraCIPerson(KernelPerson):
         """
         r, g, b = color
         self.kernel_api.person.setColor(personID=per_id, color=(r, g, b, 255))
-
-    def get_type(self, per_id):
-        """Return the type of the person of per_id."""
-        return 'request'
 
     def get_ids(self):
         """See parent class."""

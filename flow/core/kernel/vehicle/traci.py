@@ -17,6 +17,7 @@ from copy import deepcopy
 # colors for vehicles
 WHITE = (255, 255, 255)
 CYAN = (0, 255, 255)
+CYANP = (0, 125, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
@@ -99,6 +100,8 @@ class TraCIVehicle(KernelVehicle):
         self.__free_taxis = set()
         self.__pickup_taxis = set()
         self.__occupied_taxis = set()
+
+        self.__types = {}
 
     def initialize(self, vehicles):
         """Initialize vehicle state information.
@@ -474,6 +477,9 @@ class TraCIVehicle(KernelVehicle):
     def get_type(self, veh_id):
         """Return the type of the vehicle of veh_id."""
         return self.__vehicles[veh_id]["type"]
+    
+    def get_res_type(self, veh_id):
+        return self.__types[veh_id]
 
     def get_initial_speed(self, veh_id):
         """Return the initial speed of the vehicle of veh_id."""
@@ -1093,7 +1099,14 @@ class TraCIVehicle(KernelVehicle):
         for veh_id in self.get_ids():
             try:
                 if 'taxi' in veh_id:
-                    color = (GREEN if veh_id in free else ORANGE) if veh_id not in pickup else YELLOW
+                    if veh_id in free:
+                        color = GREEN
+                    else:
+                        if veh_id in pickup:
+                            color = YELLOW if self.__types[veh_id] == 0 else CYAN
+                        else:
+                            color = ORANGE if self.__types[veh_id] == 0 else CYANP
+                    # color = (GREEN if veh_id in free else ORANGE) if veh_id not in pickup else YELLOW
                     # If vehicle is already being colored via argument to vehicles.add(), don't re-color it.
                     if self._force_color_update or 'color' not in \
                             self.type_parameters[self.get_type(veh_id)]:
@@ -1222,7 +1235,7 @@ class TraCIVehicle(KernelVehicle):
         # TODO : Brent
         return 0
 
-    def dispatch_taxi(self, veh_id, reservation):
+    def dispatch_taxi(self, veh_id, reservation, tp=0):
         # cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
         # if cur_edge.startswith(':'):
         #     return
@@ -1243,6 +1256,8 @@ class TraCIVehicle(KernelVehicle):
         self.dropoff_stop[veh_id] = [ reservation.toEdge, 25 ]
         self.__free_taxis.remove(veh_id)
         self.__pickup_taxis.add(veh_id)
+
+        self.__types[veh_id] = tp
     
     def pickup(self, veh_id, mid_edges):
         self.mid_edges[veh_id] = mid_edges

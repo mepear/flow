@@ -32,6 +32,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
     total_congestion_rates = []
     mean_velocities = []
     edge_position = None
+    statistics = []
 
     obs = eval_envs.reset()
 
@@ -77,6 +78,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                 total_congestion_rates.append(info['episode']['total_congestion_rate'])
                 mean_velocities.append(info['episode']['mean_velocity'])
                 edge_position = info['episode']['edge_position']
+                statistics.append(info['episode']['statistics'])
 
     print(" Evaluation using {} episodes: mean reward {:.5f}\n".format(
         len(eval_episode_rewards), np.mean(eval_episode_rewards)))
@@ -178,7 +180,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
             )
     
     if do_plot_congestion:
-        plot_congestion(mean_velocities, edge_position, save_path)
+        plot_congestion(mean_velocities, edge_position, statistics, save_path)
 
 
 def get_corners(s, e, w):
@@ -189,7 +191,7 @@ def get_corners(s, e, w):
     return [s + p, e + p, e - p, s - p]
 
 
-def plot_congestion(mean_velocities, edge_position, save_path):
+def plot_congestion(mean_velocities, edge_position, statistics, save_path):
     fig, ax = plt.subplots()
     cmap = plt.get_cmap('Greys')
     mean_vels = np.mean(mean_velocities, axis=0)
@@ -206,5 +208,113 @@ def plot_congestion(mean_velocities, edge_position, save_path):
     plt.bar(np.arange(len(mean_vels)), np.sort(1 - mean_vels))
     plt.ylim(0., 1.)
     plt.savefig(os.path.join(save_path, 'distribution.jpg'), dpi=500)
-    
 
+    # route and location
+    ## free
+    ax = plt.subplot(3, 2, 5)
+    cnts = np.mean([sta['route']['free'] for sta in statistics], axis=0)
+    cnts /= cnts.max()
+    for cnt, (start, end, width) in zip(cnts, edge_position):
+        vertices = get_corners(start, end, width)
+        assert cnt >= 0 and cnt <= 1
+        poly = Polygon(vertices, color=cmap(cnt))
+        ax.add_patch(poly)
+    plt.xlim(-5., 160.)
+    plt.ylim(-5., 160.)
+    plt.title('free')
+    plt.xticks([]), plt.yticks([])
+    ## reposition
+    ax = plt.subplot(3, 2, 6)
+    cnts = np.mean([sta['location']['reposition'] for sta in statistics], axis=0)
+    cnts /= cnts.max()
+    for cnt, (start, end, width) in zip(cnts, edge_position):
+        vertices = get_corners(start, end, width)
+        assert cnt >= 0 and cnt <= 1
+        poly = Polygon(vertices, color=cmap(cnt))
+        ax.add_patch(poly)
+    plt.xlim(-5., 160.)
+    plt.ylim(-5., 160.)
+    plt.title('reposition location')
+    plt.xticks([]), plt.yticks([])
+    ## pickup0
+    ax = plt.subplot(3, 2, 1)
+    cnts = np.mean([sta['route']['pickup'][0] for sta in statistics], axis=0)
+    cnts /= cnts.max()
+    for cnt, (start, end, width) in zip(cnts, edge_position):
+        vertices = get_corners(start, end, width)
+        assert cnt >= 0 and cnt <= 1
+        poly = Polygon(vertices, color=cmap(cnt))
+        ax.add_patch(poly)
+    # poses = sum((sta['location']['pickup'][0] for sta in statistics), [])
+    # plt.scatter(*zip(*poses), s=2)
+    plt.xlim(-5., 160.)
+    plt.ylim(-5., 160.)
+    plt.title('pickup 0')
+    plt.xticks([]), plt.yticks([])
+    ## pickup1
+    ax = plt.subplot(3, 2, 2)
+    cnts = np.mean([sta['route']['pickup'][1] for sta in statistics], axis=0)
+    cnts /= cnts.max()
+    for cnt, (start, end, width) in zip(cnts, edge_position):
+        vertices = get_corners(start, end, width)
+        assert cnt >= 0 and cnt <= 1
+        poly = Polygon(vertices, color=cmap(cnt))
+        ax.add_patch(poly)
+    # poses = sum((sta['location']['pickup'][1] for sta in statistics), [])
+    # plt.scatter(*zip(*poses), s=2)
+    plt.xlim(-5., 160.)
+    plt.ylim(-5., 160.)
+    plt.title('pickup 1')
+    plt.xticks([]), plt.yticks([])
+    ## occupied0
+    ax = plt.subplot(3, 2, 3)
+    cnts = np.mean([sta['route']['occupied'][0] for sta in statistics], axis=0)
+    cnts /= cnts.max()
+    for cnt, (start, end, width) in zip(cnts, edge_position):
+        vertices = get_corners(start, end, width)
+        assert cnt >= 0 and cnt <= 1
+        poly = Polygon(vertices, color=cmap(cnt))
+        ax.add_patch(poly)
+    plt.xlim(-5., 160.)
+    plt.ylim(-5., 160.)
+    plt.title('occupied 0')
+    plt.xticks([]), plt.yticks([])
+    ## occupied1
+    ax = plt.subplot(3, 2, 4)
+    cnts = np.mean([sta['route']['occupied'][1] for sta in statistics], axis=0)
+    cnts /= cnts.max()
+    for cnt, (start, end, width) in zip(cnts, edge_position):
+        vertices = get_corners(start, end, width)
+        assert cnt >= 0 and cnt <= 1
+        poly = Polygon(vertices, color=cmap(cnt))
+        ax.add_patch(poly)
+    plt.xlim(-5., 160.)
+    plt.ylim(-5., 160.)
+    plt.title('occupied 1')
+    plt.xticks([]), plt.yticks([])
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, 'routes_and_locations.jpg'), dpi=500)
+
+    # # location
+    # ## pickup
+    # ax = plt.subplot(2, 1, 1)
+    # poses = sum((sta['location']['pickup'] for sta in statistics), [])
+    # plt.scatter(*zip(*poses))
+    # plt.xlim(-5., 160.)
+    # plt.ylim(-5., 160.)
+    # plt.title('pickup location')
+    # plt.xticks([]), plt.yticks([])
+
+    # ## reposition
+    # ax = plt.subplot(2, 1, 2)
+    # poses = sum((sta['location']['reposition'] for sta in statistics), [])
+    # plt.scatter(*zip(*poses), s=2)
+    # plt.xlim(-5., 160.)
+    # plt.ylim(-5., 160.)
+    # plt.title('reposition location')
+    # plt.xticks([]), plt.yticks([])
+
+    # plt.tight_layout()
+    # plt.savefig(os.path.join(save_path, 'locations.jpg'), dpi=500)
+    
