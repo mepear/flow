@@ -293,8 +293,10 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     plt.title('occupied 1')
     plt.xticks([]), plt.yticks([])
 
+    plt.suptitle('routes_and_locations from ckpt {}'.format(ckpt), y=0.00)
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.jpg'.format(ckpt)), dpi=500)
+    plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.jpg'.format(ckpt)), \
+        dpi=500, bbox_inches='tight')
 
     # # location
     # ## pickup
