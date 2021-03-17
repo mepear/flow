@@ -844,7 +844,6 @@ class DispatchAndRepositionEnv(Env):
                 remain_pending_orders.append([res, veh_id])
             elif self.k.kernel_api.person.getWaitingTime(res.persons[0]) <= self.max_waiting_time:
                 self.__dispatched_orders.append((res, veh_id))
-                print(self.k.person.get_type(res.persons[0]))
                 self.k.vehicle.dispatch_taxi(veh_id, res, tp=self.k.person.get_type(res.persons[0]))
                 self.k.person.match(res.persons[0], veh_id)
                 pickup_stat[self.k.vehicle.get_res_type(veh_id)].append(self.k.vehicle.get_2d_position(veh_id))
