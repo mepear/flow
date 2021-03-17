@@ -122,8 +122,8 @@ class DispatchAndRepositionEnv(Env):
                                 if i != j:
                                     for k in range(n_edge):
                                         if k != i and k != j:
-                                            r1 = set(self.paired_routes[i][k].edges[1:-1])
-                                            r2 = set(self.paired_routes[k][j].edges[1:-1])
+                                            r1 = set(self.paired_routes[i][k].edges[:-1])
+                                            r2 = set(self.paired_routes[k][j].edges[1:])
                                             if len(r1 & r2) > 0:
                                                 self.banned_mid_edges[i, j, k] = True
                         torch.save([self.paired_routes, self.banned_mid_edges], save_path)

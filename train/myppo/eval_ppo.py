@@ -50,5 +50,5 @@ def eval_ppo(flow_params=None):
     eval_envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
         None, save_path, device, True, flow_params=flow_params, verbose=True)
     evaluate(actor_critic, eval_envs, ob_rms, args.num_processes, device, \
-        save_path=save_path, do_plot_congestion=args.plot_congestion)
+        save_path=save_path, do_plot_congestion=args.plot_congestion, ckpt=args.eval_ckpt)
     eval_envs.close()

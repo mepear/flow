@@ -11,7 +11,7 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
 def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
-    save_path=None, writer=None, total_num_steps=None, do_plot_congestion=False):
+    save_path=None, writer=None, total_num_steps=None, do_plot_congestion=False, ckpt=None):
     # # flow_params['sim'].render = True
     # eval_envs = make_vec_envs(env_name, seed, num_processes,
     #                           None, eval_log_dir, device, True, flow_params=flow_params, port=port, verbose=verbose)
@@ -180,7 +180,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
             )
     
     if do_plot_congestion:
-        plot_congestion(mean_velocities, edge_position, statistics, save_path)
+        plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
 
 
 def get_corners(s, e, w):
@@ -191,7 +191,7 @@ def get_corners(s, e, w):
     return [s + p, e + p, e - p, s - p]
 
 
-def plot_congestion(mean_velocities, edge_position, statistics, save_path):
+def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt):
     fig, ax = plt.subplots()
     cmap = plt.get_cmap('Greys')
     mean_vels = np.mean(mean_velocities, axis=0)
@@ -202,12 +202,12 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path):
         ax.add_patch(poly)
     plt.xlim(-5., 160.)
     plt.ylim(-5., 160.)
-    plt.savefig(os.path.join(save_path, 'congestion.jpg'), dpi=500)
+    plt.savefig(os.path.join(save_path, 'congestion_{}.jpg'.format(ckpt)), dpi=500)
 
     fig, ax = plt.subplots()
     plt.bar(np.arange(len(mean_vels)), np.sort(1 - mean_vels))
     plt.ylim(0., 1.)
-    plt.savefig(os.path.join(save_path, 'distribution.jpg'), dpi=500)
+    plt.savefig(os.path.join(save_path, 'distribution_{}.jpg'.format(ckpt)), dpi=500)
 
     # route and location
     ## free
@@ -294,7 +294,7 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path):
     plt.xticks([]), plt.yticks([])
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'routes_and_locations.jpg'), dpi=500)
+    plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.jpg'.format(ckpt)), dpi=500)
 
     # # location
     # ## pickup
