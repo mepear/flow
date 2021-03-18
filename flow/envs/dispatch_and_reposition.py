@@ -107,29 +107,7 @@ class DispatchAndRepositionEnv(Env):
         }
 
         self.edges = self.k.network.get_edge_list()
-        n_edge = len(self.edges)
-        save_path = os.path.join(env_params.save_path, 'preprocess.pt')
-        while True:
-            try:
-                with Lock(name='preprocess'):
-                    if os.path.exists(save_path):
-                        self.paired_routes, self.banned_mid_edges = torch.load(save_path)
-                    else:
-                        self.paired_routes = [[self.k.kernel_api.simulation.findRoute(s, t) for t in self.edges] for s in self.edges]
-                        self.banned_mid_edges = torch.zeros((n_edge, n_edge, n_edge), dtype=bool)
-                        for i in range(n_edge):
-                            for j in range(n_edge):
-                                if i != j:
-                                    for k in range(n_edge):
-                                        if k != i and k != j:
-                                            r1 = set(self.paired_routes[i][k].edges[:-1])
-                                            r2 = set(self.paired_routes[k][j].edges[1:])
-                                            if len(r1 & r2) > 0:
-                                                self.banned_mid_edges[i, j, k] = True
-                        torch.save([self.paired_routes, self.banned_mid_edges], save_path)
-                break
-            except CannotAcquireLock:
-                pass
+        self._preprocess()
 
         self.num_taxi = network.vehicles.num_rl_vehicles
         self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi) == 'taxi']
@@ -158,6 +136,52 @@ class DispatchAndRepositionEnv(Env):
 
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
+
+    def _preprocess(self):
+        def _add_center(edges):
+            ret = []
+            for i in range(len(edges) - 1):
+                ret.append(edges[i])
+                ret.append(self.centers[edges[i] + '&' + edges[i + 1]])
+            ret.append(edges[-1])
+            return ret
+
+        n_edge = len(self.edges)
+        save_path = os.path.join(self.env_params.save_path, 'preprocess.pt')
+        while True:
+            try:
+                with Lock(name='preprocess'):
+                    if os.path.exists(save_path):
+                        self.paired_routes, self.paired_complete_routes, self.banned_mid_edges = \
+                            torch.load(save_path)
+                    else:
+                        self.paired_routes = [
+                            [self.k.kernel_api.simulation.findRoute(s, t) for t in self.edges] for s in self.edges
+                        ]
+                        self.centers = {}
+                        for edge1 in self.network.edges:
+                            for edge2 in self.network.edges:
+                                if edge1['to'] == edge2['from']:
+                                    self.centers[edge1['id'] + '&' + edge2['id']] = edge1['to']
+                        self.paired_complete_routes = [
+                            [_add_center(route.edges) for route in routes] for routes in self.paired_routes
+                        ]
+                        self.banned_mid_edges = torch.zeros((n_edge, n_edge, n_edge), dtype=bool)
+                        for i in range(n_edge):
+                            for j in range(n_edge):
+                                if i != j:
+                                    for k in range(n_edge):
+                                        if k != i and k != j:
+                                            r1 = set(self.paired_complete_routes[i][k][:-1])
+                                            r2 = set(self.paired_complete_routes[k][j][1:])
+                                            if len(r1 & r2) > 0:
+                                                self.banned_mid_edges[i, j, k] = True
+                        torch.save([self.paired_routes, self.paired_complete_routes, self.banned_mid_edges], \
+                            save_path)
+                break
+            except CannotAcquireLock:
+                pass
+
 
     def get_action_mask(self):
         mask = torch.zeros_like(self.action_mask[0])
