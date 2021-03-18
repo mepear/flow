@@ -766,6 +766,20 @@ class DispatchAndRepositionEnv(Env):
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos, tp=tp)
+        elif self.distribution == 'mode-X1-1':
+            idx = self.k.person.total
+            rn, rn2 =  np.random.rand(), np.random.rand()
+            if rn < 0.5:
+                edge_id1 = 'bot3_1_0'
+                edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+                tp = 0
+            else:
+                edge_id1 = 'bot2_1_0'
+                edge_id2 = 'bot1_3_0' if rn2 < 0.5 else 'left2_3_0'
+                tp = 1
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(20, self.inner_length - 20)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos, tp=tp)
         elif self.distribution == 'mode-X2':
             idx = self.k.person.total
             t =  self.time_counter / self.env_params.sims_per_step / self.env_params.horizon
