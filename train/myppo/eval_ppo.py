@@ -40,7 +40,7 @@ def eval_ppo(flow_params=None):
 
     save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
     pt =  os.path.join(save_path, str(args.eval_ckpt) + ".pt")
-    actor_critic, ob_rms = torch.load(pt, map_location='cpu')
+    actor_critic, _ = torch.load(pt, map_location='cpu')
     actor_critic.to(device)
 
     screenshot_path = os.path.join(save_path, "images") if args.save_screenshot else None
@@ -48,7 +48,7 @@ def eval_ppo(flow_params=None):
     flow_params['sim'].render = not args.disable_render_during_eval
     flow_params['sim'].save_render = screenshot_path
     eval_envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
-        None, save_path, device, True, flow_params=flow_params, verbose=True)
-    evaluate(actor_critic, eval_envs, ob_rms, args.num_processes, device, \
+        None, save_path, True, device=device, flow_params=flow_params, verbose=True)
+    evaluate(actor_critic, eval_envs, args.num_processes, device, \
         save_path=save_path, do_plot_congestion=args.plot_congestion, ckpt=args.eval_ckpt)
     eval_envs.close()

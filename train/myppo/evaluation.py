@@ -10,16 +10,11 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
-def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
+def evaluate(actor_critic, eval_envs, num_processes, device, \
     save_path=None, writer=None, total_num_steps=None, do_plot_congestion=False, ckpt=None):
     # # flow_params['sim'].render = True
     # eval_envs = make_vec_envs(env_name, seed, num_processes,
     #                           None, eval_log_dir, device, True, flow_params=flow_params, port=port, verbose=verbose)
-
-    vec_norm = utils.get_vec_normalize(eval_envs)
-    if vec_norm is not None:
-        vec_norm.eval()
-        vec_norm.ob_rms = ob_rms
 
     eval_episode_rewards = []
     nums_orders = []
@@ -39,7 +34,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
     eval_recurrent_hidden_states = torch.zeros(
         num_processes, actor_critic.recurrent_hidden_state_size, device=device)
     eval_masks = torch.zeros(num_processes, 1, device=device)
-    action_mask = None
+    action_masks = None
     values = []
     while len(eval_episode_rewards) < num_processes:
         with torch.no_grad():
@@ -47,7 +42,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                 obs,
                 eval_recurrent_hidden_states,
                 eval_masks,
-                action_mask=action_mask,
+                action_masks=action_masks,
                 deterministic=True)
         
         values.append(value) # To be used
@@ -61,9 +56,9 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
             device=device)
         
         try:
-            action_mask = torch.cat([info['action_mask'] for info in infos], dim=0)
+            action_masks = torch.cat([info['action_mask'] for info in infos], dim=0)
         except KeyError:
-            action_mask = None
+            action_masks = None
 
         for info in infos:
             if 'episode' in info.keys():

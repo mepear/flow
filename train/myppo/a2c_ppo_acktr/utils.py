@@ -64,3 +64,6 @@ def cleanup_log_dir(log_dir):
         files = glob.glob(os.path.join(log_dir, '*.monitor.csv'))
         for f in files:
             os.remove(f)
+
+def tocpu(tensors):
+    return [tensor.cpu() for tensor in tensors]

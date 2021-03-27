@@ -200,7 +200,7 @@ class DispatchAndRepositionEnv(Env):
     def action_space(self):
         """See class definition."""
         return MultiDiscrete([len(self.edges), self.num_taxi + 1] + [len(self.edges)] * self.n_mid_edge)
-        # return MultiDiscrete([self.num_taxi + 1, len(self.edges)]) # TODO: add routing
+        # return MultiDiscrete([self.num_taxi + 1, len(self.edges)])
 
     @property
     def observation_space(self):

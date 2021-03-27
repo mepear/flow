@@ -437,13 +437,15 @@ class Env(gym.Env, metaclass=ABCMeta):
 
         # test if the environment should terminate due to a collision or the
         # time horizon being met
-        done = (self.time_counter >= self.env_params.sims_per_step *
-                (self.env_params.warmup_steps + self.env_params.horizon)
-                or crash)
+        # done = (self.time_counter >= self.env_params.sims_per_step *
+        #         (self.env_params.warmup_steps + self.env_params.horizon)
+        #         or crash)
         
-        #TODO for debug
         done = self.time_counter >= self.env_params.sims_per_step * \
                 (self.env_params.warmup_steps + self.env_params.horizon)
+        
+        if crash:
+            print('*' * 10, 'crash', crash, '*' * 10)
 
         # compute the reward
         if self.env_params.clip_actions:

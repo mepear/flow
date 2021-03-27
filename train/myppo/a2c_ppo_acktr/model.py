@@ -55,9 +55,9 @@ class Policy(nn.Module):
     def forward(self, inputs, rnn_hxs, masks):
         raise NotImplementedError
 
-    def act(self, inputs, rnn_hxs, masks, action_mask=None, deterministic=False):
+    def act(self, inputs, rnn_hxs, masks, action_masks=None, deterministic=False):
         value, actor_features, rnn_hxs = self.base(inputs, rnn_hxs, masks)
-        dist = self.dist(actor_features, mask=action_mask)
+        dist = self.dist(actor_features, masks=action_masks)
 
         if deterministic:
             action = dist.mode()

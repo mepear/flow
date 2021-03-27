@@ -127,6 +127,7 @@ class Monitor(gym.Wrapper):
                 self.file_handler.flush()
             info["episode"] = ep_info
         info['action_mask'] = self.env.get_action_mask()
+        info['reward'] = reward
         self.total_steps += 1
         return observation, reward, done, info
 
