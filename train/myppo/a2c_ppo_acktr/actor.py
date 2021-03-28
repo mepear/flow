@@ -37,7 +37,7 @@ class Actor:
                 for i, env in enumerate(self.envs):
                     actions = self.action_futures[i].wait()
                     model_inputs = env.step(actions)
-                    if j == self.n_step - 1:
-                        obs, reward, done, infos = model_inputs
+                    obs, reward, done, infos = model_inputs
+                    if j == self.n_step - 1 and done[0] != True:
                         model_inputs = env.reset(), reward, done, infos
                     self.action_futures[i] = self.agent_rref.rpc_async().select_action(self.id, i, model_inputs)

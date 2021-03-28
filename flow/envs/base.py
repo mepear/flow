@@ -407,14 +407,14 @@ class Env(gym.Env, metaclass=ABCMeta):
             self.k.simulation.simulation_step()
 
             # store new observations in the vehicles and traffic lights class
-            self.k.update(reset=False)
+            crash = self.k.update(reset=False)
 
             # update the colors of vehicles
             if self.sim_params.render:
                 self.k.vehicle.update_vehicle_colors()
 
             # crash encodes whether the simulator experienced a collision
-            crash = self.k.simulation.check_collision()
+            crash |= self.k.simulation.check_collision()
 
             # stop collecting new simulation steps if there is a collision
             if crash:
@@ -426,7 +426,10 @@ class Env(gym.Env, metaclass=ABCMeta):
         # compute the info for each agent
         infos = self._get_infos() if hasattr(self, '_get_infos') else {}
 
-        states = self.get_state()
+        if not crash:
+            states = self.get_state()
+        else:
+            states = np.zeros(self.observation_space.shape)
 
         # collect information of the state of the network based on the
         # environment class used
@@ -441,8 +444,8 @@ class Env(gym.Env, metaclass=ABCMeta):
         #         (self.env_params.warmup_steps + self.env_params.horizon)
         #         or crash)
         
-        done = self.time_counter >= self.env_params.sims_per_step * \
-                (self.env_params.warmup_steps + self.env_params.horizon)
+        done = (self.time_counter >= self.env_params.sims_per_step * \
+                (self.env_params.warmup_steps + self.env_params.horizon)) or crash
         
         if crash:
             print('*' * 10, 'crash', crash, '*' * 10)

@@ -101,11 +101,13 @@ class Kernel(object): # TODO: add person
             specifies whether the simulator was reset in the last simulation
             step
         """
-        self.vehicle.update(reset)
+        crash = False
+        crash |= self.vehicle.update(reset)
         self.person.update(reset)
         self.traffic_light.update(reset)
         self.network.update(reset)
         self.simulation.update(reset)
+        return crash
 
     def close(self):
         """Terminate all components within the simulation and network."""

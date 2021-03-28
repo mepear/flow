@@ -425,8 +425,10 @@ class DispatchAndRepositionEnv(Env):
 
         self._dispatch_taxi()
 
-    def compute_reward(self, rl_actions, **kwargs):
+    def compute_reward(self, rl_actions, fail=False):
         """See class definition."""
+        if fail:
+            return 0.
         reward = 0
         free_taxi = self.k.vehicle.get_taxi_fleet(0)
         pickup_taxi = self.k.vehicle.get_taxi_fleet(1)
