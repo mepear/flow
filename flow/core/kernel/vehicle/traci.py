@@ -1319,8 +1319,6 @@ class TraCIVehicle(KernelVehicle):
             print(self.kernel_api.vehicle.getLaneID(veh_id), edge_id)
 
     def reposition_taxi_by_road(self, veh_id, edge_id):
-        if edge_id == self.kernel_api.vehicle.getRoadID(veh_id):
-            return
         self.kernel_api.vehicle.resume(veh_id)
         self.kernel_api.vehicle.changeTarget(veh_id, edge_id)
         self.kernel_api.vehicle.setStop(veh_id, edge_id, 25, 0)

@@ -38,6 +38,7 @@ class Actor:
                     actions = self.action_futures[i].wait()
                     model_inputs = env.step(actions)
                     obs, reward, done, infos = model_inputs
-                    if j == self.n_step - 1 and done[0] != True:
+                    if j == self.n_step - 1 and any(~done):
+                        print('actor', self.id, 'crash reset')
                         model_inputs = env.reset(), reward, done, infos
                     self.action_futures[i] = self.agent_rref.rpc_async().select_action(self.id, i, model_inputs)

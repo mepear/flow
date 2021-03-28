@@ -65,7 +65,7 @@ class ReplayBuffer:
             rollout.obs[0, span] = obs
             return
         
-        assert done.all() or (~done).all()
+        # assert done.all() or (~done).all()
         rollout.insert_before_inference(span, obs, rewards, action_masks, done, masks, bad_masks)
         # print('return replay_buffer.insert_before_inference')
 

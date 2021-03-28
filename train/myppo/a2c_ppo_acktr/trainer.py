@@ -105,7 +105,7 @@ class Trainer:
 
     @rpc.functions.async_execution
     def select_action(self, actor_id, split_id, model_inputs, init=False):
-        # if split_id == 0: print('select action for actor {} split {}'.format(actor_id, split_id))
+        # print('select action for actor {} split {}'.format(actor_id, split_id))
         if init == True:
             obs = model_inputs
             reward = torch.zeros(self.n_env_per_split, 1).float()
@@ -115,19 +115,20 @@ class Trainer:
         else:
             obs, reward, done, infos = model_inputs
             action_masks = torch.cat([info['action_mask'] for info in infos], dim=0)
-        # if split_id == 0: print('after select action for actor {} split {}'.format(actor_id, split_id))
+        # print('after select action for actor {} split {}'.format(actor_id, split_id))
         obs = obs.to(self.device)
 
-        # if split_id == 0: print('obs to device for actor {} split {}'.format(actor_id, split_id))
+        # print('obs to device for actor {} split {}'.format(actor_id, split_id))
         masks = torch.FloatTensor([[0.0] if done_ else [1.0] for done_ in done])
         bad_masks = torch.FloatTensor([[0.0] if 'bad_transition' in info.keys() else [1.0] \
             for info in infos])
         done = torch.tensor(done, dtype=bool)
 
-        # if split_id == 0: print('insert before inference for actor {} split {}'.format(actor_id, split_id))
+        # print('insert before inference for actor {} split {}'.format(actor_id, split_id))
         self.buffer.insert_before_inference(actor_id, split_id, obs, reward, action_masks, masks, \
             bad_masks, done, init)
 
+        # print('collect rollout rewards for actor {} split {}'.format(actor_id, split_id))
         # collect rollout information
         if init == False:
             self.rollout_rewards[split_id, actor_id] += torch.tensor([info['reward'] for info in infos])
@@ -139,11 +140,11 @@ class Trainer:
                 self.n_env_per_split)
             return action_batch[batch_slice]
         
-        # if split_id == 0: print('future for actor {} split {}'.format(actor_id, split_id))
+        # print('future for actor {} split {}'.format(actor_id, split_id))
 
         fut = self.future_outputs[split_id].then(_unpack)
 
-        # if split_id == 0: print('before lock for actor {} split {}'.format(actor_id, split_id))
+        # print('before lock for actor {} split {}'.format(actor_id, split_id))
 
         with self.locks[split_id]:
             self.split_cnt[split_id] += 1
@@ -166,6 +167,8 @@ class Trainer:
                 cur_fut = self.future_outputs[split_id]
                 cur_fut.set_result(action)
                 self.future_outputs[split_id] = torch.futures.Future()
+
+        # print('after lock for actor {} split {}'.format(actor_id, split_id))
 
         return fut
 

@@ -10,7 +10,7 @@ python train/train.py \
     --num-envs=8 \
     --num-actors=2 \
     --num-splits=2 \
-    --eval-num-processes=50 \
+    --eval-num-processes=1 \
     --num-steps=500 \
     --num-mini-batch=16 \
     --log-interval=1 \
