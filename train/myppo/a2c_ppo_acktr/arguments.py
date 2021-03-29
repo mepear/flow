@@ -88,10 +88,27 @@ def get_args(args):
         default=False,
         help="sets flags for determinism when using CUDA (potentially slow!)")
     parser.add_argument(
+        '--num-envs',
+        type=int,
+        default=16,
+        help='how many envs to run (default: 16)')
+    parser.add_argument(
+        '--num-actors',
+        type=int,
+        default=4,
+        help='how many actors to run (default: 4)'
+    )
+    parser.add_argument(
+        '--num-splits',
+        type=int,
+        default=4,
+        help='how many split in an actor (default: 4)'
+    )
+    parser.add_argument(
         '--num-processes',
         type=int,
         default=16,
-        help='how many training CPU processes to use (default: 16)')
+        help='how many processes to run (default: 16), deprecated')
     parser.add_argument(
         '--eval-num-processes',
         type=int,
@@ -135,7 +152,7 @@ def get_args(args):
     parser.add_argument(
         '--num-env-steps',
         type=int,
-        default=10e6,
+        default=int(10e6),
         help='number of environment steps to train (default: 10e6)')
     parser.add_argument(
         '--env-name',
@@ -202,6 +219,18 @@ def get_args(args):
         '--disable-render-during-eval',
         action='store_true',
         default=False,
+    )
+    parser.add_argument(
+        '--queue-size',
+        type=int,
+        default=1,
+        help='size of queue in replay buffer'
+    )
+    parser.add_argument(
+        '--reuse',
+        type=int,
+        default=1,
+        help='number of times a slot is used in training'
     )
     args = parser.parse_args(args) if args is not None else parser.parse_args()
 

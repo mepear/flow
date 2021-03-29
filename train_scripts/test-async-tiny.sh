@@ -1,16 +1,16 @@
 python train/train.py \
-    test-stl-nw-noprofit-X2 \
-    --experiment-name=test-stl-nw-noprofit-X2 \
-    --num-env-steps=300000000 \
+    test-stl-nw-profit-large \
+    --experiment-name=test-async-tiny \
+    --num-env-steps=200000000 \
     --algo=ppo \
     --use-gae \
     --lr=2.5e-4 \
     --clip-param=0.1 \
     --value-loss-coef=0.5 \
-    --num-envs=800 \
-    --num-actors=10 \
+    --num-envs=8 \
+    --num-actors=2 \
     --num-splits=2 \
-    --eval-num-processes=50 \
+    --eval-num-processes=1 \
     --num-steps=500 \
     --num-mini-batch=16 \
     --log-interval=1 \

@@ -113,11 +113,11 @@ class MultiCategorical(nn.Module):
             gain=0.01)
         self.linear = init_(nn.Linear(num_inputs, sum(action_dims)))
 
-    def forward(self, x, mask=None):
+    def forward(self, x, masks=None):
         x = self.linear(x)
-        if mask is not None:
-            assert x.size() == mask.size()
-            x[mask] = -float('inf')
+        if masks is not None:
+            assert x.size() == masks.size()
+            x[masks] = -float('inf')
         return FixedMultiCategorical(logits=x, action_dims=self.action_dims)
 
 class DiagGaussian(nn.Module):

@@ -200,7 +200,7 @@ class DispatchAndRepositionEnv(Env):
     def action_space(self):
         """See class definition."""
         return MultiDiscrete([len(self.edges), self.num_taxi + 1] + [len(self.edges)] * self.n_mid_edge)
-        # return MultiDiscrete([self.num_taxi + 1, len(self.edges)]) # TODO: add routing
+        # return MultiDiscrete([self.num_taxi + 1, len(self.edges)])
 
     @property
     def observation_space(self):
@@ -425,8 +425,10 @@ class DispatchAndRepositionEnv(Env):
 
         self._dispatch_taxi()
 
-    def compute_reward(self, rl_actions, **kwargs):
+    def compute_reward(self, rl_actions, fail=False):
         """See class definition."""
+        if fail:
+            return 0.
         reward = 0
         free_taxi = self.k.vehicle.get_taxi_fleet(0)
         pickup_taxi = self.k.vehicle.get_taxi_fleet(1)

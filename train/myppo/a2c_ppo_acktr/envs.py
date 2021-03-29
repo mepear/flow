@@ -83,9 +83,9 @@ def make_vec_envs(env_name,
                   num_processes,
                   gamma,
                   save_path,
-                  device,
                   allow_early_resets,
                   port=None,
+                  device=None,
                   num_frame_stack=None,
                   popart_reward=False,
                   flow_params=None,
@@ -94,7 +94,6 @@ def make_vec_envs(env_name,
 
     while True:
         try:
-            print('make_vec_envs')
             with Lock(name='make_vec_envs'):
                 if flow_params is None:
                     envs = [
@@ -103,9 +102,9 @@ def make_vec_envs(env_name,
                     ]
                 else:
                     envs = []
+                    env_params = copy.deepcopy(flow_params)
+                    env_params['sim'].seed = seed
                     for i in range(num_processes):
-                        env_params = copy.deepcopy(flow_params)
-                        env_params['sim'].seed = seed
                         if port is not None:
                             envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
                                 port=port + i, popart_reward=popart_reward, gamma=gamma, \
@@ -127,13 +126,15 @@ def make_vec_envs(env_name,
                     else:
                         envs = VecNormalize(envs, gamma=gamma)
 
-                envs = VecPyTorch(envs, device)
-
-                if num_frame_stack is not None:
-                    envs = VecPyTorchFrameStack(envs, num_frame_stack, device)
-                elif len(envs.observation_space.shape) == 3:
-                    envs = VecPyTorchFrameStack(envs, 4, device)
-
+                if device is not None:
+                    envs = VecPyTorch(envs, device)
+                    if num_frame_stack is not None:
+                        envs = VecPyTorchFrameStack(envs, num_frame_stack, device)
+                    elif len(envs.observation_space.shape) == 3:
+                        envs = VecPyTorchFrameStack(envs, 4, device)
+                else:
+                    envs = Converter(envs)
+                
                 return envs
         except CannotAcquireLock:
             print("Try again")
@@ -189,6 +190,29 @@ class TransposeImage(TransposeObs):
         return ob.transpose(self.op[0], self.op[1], self.op[2])
 
 
+class Converter(VecEnvWrapper):
+    def __init__(self, venv):
+        super(Converter, self).__init__(venv)
+
+    def reset(self):
+        obs = self.venv.reset()
+        obs = torch.from_numpy(obs).float()
+        return obs
+
+    def step_async(self, actions):
+        if isinstance(actions, torch.LongTensor):
+            # Squeeze the dimension for discrete actions
+            actions = actions.squeeze(1)
+        actions = actions.cpu().numpy()
+        self.venv.step_async(actions)
+
+    def step_wait(self):
+        obs, reward, done, info = self.venv.step_wait()
+        obs = torch.from_numpy(obs).float()
+        reward = torch.from_numpy(reward).unsqueeze(dim=1).float()
+        return obs, reward, done, info
+
+
 class VecPyTorch(VecEnvWrapper):
     def __init__(self, venv, device):
         """Return only every `skip`-th frame"""
@@ -197,7 +221,6 @@ class VecPyTorch(VecEnvWrapper):
         # TODO: Fix data types
 
     def reset(self):
-
         obs = self.venv.reset()
         obs = torch.from_numpy(obs).float().to(self.device)
         return obs

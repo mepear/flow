@@ -151,6 +151,8 @@ class TraCIVehicle(KernelVehicle):
             specifies whether the simulator was reset in the last simulation
             step
         """
+        crash = False
+
         # copy over the previous speeds
 
         vehicle_obs = {}
@@ -172,6 +174,7 @@ class TraCIVehicle(KernelVehicle):
             # if veh_id not in self.get_rl_ids():
             print('update remove', veh_id)
             self.remove(veh_id)
+            crash = True
             # remove exiting vehicles from the vehicle subscription if they
             # haven't been removed already
             if vehicle_obs[veh_id] is None:
@@ -281,6 +284,8 @@ class TraCIVehicle(KernelVehicle):
 
         # make sure the rl vehicle list is still sorted
         self.__rl_ids.sort()
+
+        return crash
 
     def _add_departed(self, veh_id, veh_type):
         """Add a vehicle that entered the network from an inflow or reset.
