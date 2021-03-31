@@ -207,7 +207,7 @@ class Trainer:
             end_time = time.time()
             print('\n' + '=' * 20, "Updates {}, num timesteps {}, FPS {}, cur FPS {}\n".format(idx, \
                 total_num_steps, int(total_num_steps / (end_time - self.start_time)), \
-                    int(total_num_steps / (end_time - self.up_start_time))))
+                    int(self.batch_size / (end_time - self.up_start_time))))
 
     def save_train(self, idx):
         if idx % self.save_interval == 0:
