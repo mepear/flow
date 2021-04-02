@@ -102,6 +102,7 @@ class Trainer:
             actor_rref = rpc.remote(name, Actor, args=(i, self.env_fn, self.rref, self.args))
             actor_rref.remote().run()
             self.actor_rrefs.append(actor_rref)
+            time.sleep(10)
 
     @rpc.functions.async_execution
     def select_action(self, actor_id, split_id, model_inputs, init=False):
@@ -211,12 +212,14 @@ class Trainer:
 
     def save_train(self, idx):
         if idx % self.save_interval == 0:
-            torch.save([self.actor_critic, None], \
+            ob_rms = self.actor_rrefs[0].rpc_sync().get_ob_rms()
+            torch.save([self.actor_critic, ob_rms], \
                 os.path.join(self.save_path, str(idx // self.save_interval) + ".pt"))
 
     def eval(self, idx):
         total_num_steps = (idx + 1) * self.batch_size
-        evaluate(self.actor_critic, self.eval_envs, self.eval_num_processes, self.device, \
+        ob_rms = self.actor_rrefs[0].rpc_sync().get_ob_rms()
+        evaluate(self.actor_critic, self.eval_envs, ob_rms, self.eval_num_processes, self.device, \
             self.save_path, self.writer, total_num_steps)
 
     def run(self):

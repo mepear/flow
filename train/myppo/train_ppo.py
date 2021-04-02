@@ -30,7 +30,7 @@ def train(rank, args, flow_params=None):
     os.environ['MASTER_PORT'] = str(args.master_port)
     if rank == 0:
         rpc_opt = rpc.TensorPipeRpcBackendOptions(num_worker_threads=\
-            max(16, args.num_splits * args.num_actors), rpc_timeout=300)
+            max(16, args.num_splits * args.num_actors), rpc_timeout=500)
         rpc.init_rpc('agent', rank=rank, world_size=args.num_actors + 1, rpc_backend_options=rpc_opt)
 
         torch.manual_seed(args.seed)
@@ -51,7 +51,7 @@ def train(rank, args, flow_params=None):
         trainer = Trainer(args, flow_params)
         trainer.run()
     else:
-        rpc_opt = rpc.TensorPipeRpcBackendOptions(rpc_timeout=300)
+        rpc_opt = rpc.TensorPipeRpcBackendOptions(rpc_timeout=500)
         rpc.init_rpc('actor_' + str(rank - 1), rank=rank, world_size=args.num_actors + 1, rpc_backend_options=rpc_opt)
     rpc.shutdown()
 

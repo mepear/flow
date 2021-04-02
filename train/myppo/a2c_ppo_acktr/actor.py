@@ -26,6 +26,9 @@ class Actor:
         self.action_futures = []
         print('actor {} init completes'.format(actor_id))
 
+    def get_ob_rms(self):
+        return self.envs[0].ob_rms
+
     def run(self):
         for i, env in enumerate(self.envs):
             obs = env.reset()

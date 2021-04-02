@@ -10,11 +10,16 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
-def evaluate(actor_critic, eval_envs, num_processes, device, \
+def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
     save_path=None, writer=None, total_num_steps=None, do_plot_congestion=False, ckpt=None):
     # # flow_params['sim'].render = True
     # eval_envs = make_vec_envs(env_name, seed, num_processes,
     #                           None, eval_log_dir, device, True, flow_params=flow_params, port=port, verbose=verbose)
+
+    vec_norm = utils.get_vec_normalize(eval_envs)
+    if vec_norm is not None:
+        vec_norm.eval()
+        vec_norm.ob_rms = ob_rms
 
     eval_episode_rewards = []
     nums_orders = []
