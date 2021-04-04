@@ -1,15 +1,15 @@
 python train/train.py \
     test-stl-nw-profit-X2-large \
-    --experiment-name=test-stl-nw-profit-X2-large_test \
-    --num-env-steps=200000000 \
+    --experiment-name=test-stl-nw-profit-X2-large_test2 \
+    --num-env-steps=400000000 \
     --algo=ppo \
     --use-gae \
     --lr=2.5e-4 \
     --clip-param=0.1 \
     --value-loss-coef=0.5 \
-    --num-envs=100 \
-    --num-actors=1 \
-    --num-splits=1 \
+    --num-envs=200 \
+    --num-actors=4 \
+    --num-splits=2 \
     --eval-num-processes=50 \
     --num-steps=500 \
     --num-mini-batch=4 \

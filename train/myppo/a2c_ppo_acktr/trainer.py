@@ -232,7 +232,7 @@ class Trainer:
             self.up_start_time = time.time()
             if self.use_linear_lr_decay:
                 # decrease learning rate linearly
-                update_linear_schedule(self.agent.optimizer, j, num_updates, self.lr)
+                update_linear_schedule(self.agent.optimizer, j, num_updates, self.lr) # TODO: num_updates
 
             self.train(j)
 

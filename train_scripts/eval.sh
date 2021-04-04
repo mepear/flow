@@ -1,6 +1,6 @@
-python train/eval_myppo.py test-stl-nw-noprofit-X2 \
-    --experiment-name=test-stl-nw-noprofit-X2 \
+python train/eval_myppo.py test-stl-nw-profit-X2-large \
+    --experiment-name=test-stl-nw-profit-X2-large_fix \
     --algo=ppo \
     --num-processes=1 \
     --verbose \
-    --eval-ckpt=60
+    --eval-ckpt=73

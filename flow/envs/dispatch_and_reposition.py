@@ -43,6 +43,7 @@ ADDITIONAL_ENV_PARAMS = {
     "reservation_order": 'random', # random or fifo 
     "n_mid_edge": 0, # number of mid point for an order
     "use_tl": False, # whether using traffic light info
+    "max_detour": 1.5, # detour length / minimal length <= max_detour
 }
 
 class DispatchAndRepositionEnv(Env):
@@ -67,6 +68,7 @@ class DispatchAndRepositionEnv(Env):
         self.tle_penalty = env_params.additional_params['tle_penalty']
         self.exist_penalty = env_params.additional_params['exist_penalty']
         self.starting_distance = env_params.additional_params['starting_distance']
+        self.max_detour = env_params.additional_params['max_detour']
 
         self.person_prob = env_params.additional_params['person_prob']
         
@@ -137,6 +139,56 @@ class DispatchAndRepositionEnv(Env):
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
 
+        # test for several functions    
+        if 'ENV_TEST' in os.environ and os.environ['ENV_TEST'] == '1':
+            self._test()
+
+    def _test(self):
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Polygon
+        from matplotlib.collections import PatchCollection
+
+        def get_corners(s, e, w):
+            s, e = np.array(s), np.array(e)
+            se = e - s
+            p = np.array([-se[1], se[0]])
+            p = p / np.linalg.norm(p) * w / 2
+            return [s + p, e + p, e - p, s - p]
+        
+        edge1 = 'bot2_1_0'
+        edge2 = 'bot1_3_0'
+        edge3 = 'top2_3_0'
+
+        id1 = self.edges.index(edge1)
+        id2 = self.edges.index(edge2)
+        id3 = self.edges.index(edge3)
+
+        route1 = set(self.paired_complete_routes[id1][id2])
+        route2 = set(self.paired_complete_routes[id2][id3])
+        # print('part 1', route1)
+        # print('part 2', route2)
+        # print('intersect', route1 & route2)
+
+        fig, ax = plt.subplots()
+        patches = []
+        colors = []
+        for i in range(len(self.edges)):
+            poly = Polygon(get_corners(*self.edge_position[i]), True)
+            patches.append(poly)
+            if self.banned_mid_edges[id1, id2, i]:
+                colors.append(100.0)
+            else:
+                colors.append(0.0)
+        p = PatchCollection(patches)
+        p.set_array(np.array(colors))
+        ax.add_collection(p)
+        fig.colorbar(p, ax=ax)
+        plt.xlim(-5, 160)
+        plt.ylim(-5, 160)
+        plt.show()
+        
+        exit(0)
+
     def _preprocess(self):
         def _add_center(edges):
             ret = []
@@ -170,11 +222,14 @@ class DispatchAndRepositionEnv(Env):
                         for i in range(n_edge):
                             for j in range(n_edge):
                                 if i != j:
+                                    l = len(self.paired_routes[i][j].edges)
                                     for k in range(n_edge):
                                         if k != i and k != j:
+                                            l1 = len(self.paired_routes[i][k].edges)
+                                            l2 = len(self.paired_routes[k][j].edges)
                                             r1 = set(self.paired_complete_routes[i][k][:-1])
                                             r2 = set(self.paired_complete_routes[k][j][1:])
-                                            if len(r1 & r2) > 0:
+                                            if len(r1 & r2) > 0 or l1 + l2 - 1 > self.max_detour * l:
                                                 self.banned_mid_edges[i, j, k] = True
                         torch.save([self.paired_routes, self.paired_complete_routes, self.banned_mid_edges], \
                             save_path)
