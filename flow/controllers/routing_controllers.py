@@ -84,6 +84,60 @@ class MinicityRouter(BaseRouter):
 
         return next_route
 
+class OuterCycleRouter(BaseRouter):
+    """A router used to continuously re-route vehicles in outer cycle.
+
+    Vehicles are spreaded evenly in each lane of outer cycle. 
+
+    Usage
+    -----
+    See base class for usage example.
+    """
+
+    CYCLES = [ \
+        ['right3_0_0', 'bot3_1_0', 'bot3_2_0', 'bot3_3_0', 'left3_3_0', 'left2_3_0', \
+            'left1_3_0', 'top0_3_0', 'top0_2_0', 'top0_1_0', 'right1_0_0', 'right2_0_0'], \
+        ['left2_0_0', 'left1_0_0', 'bot0_1_0', 'bot0_2_0', 'bot0_3_0', 'right1_3_0', \
+            'right2_3_0', 'right3_3_0', 'top3_3_0', 'top3_2_0', 'top3_1_0', 'left3_0_0']
+        ]
+
+    def _get_closest_edge(self, cur_edge, edges, env):
+        min_dist = int(1e9)
+        closest_edge = None
+        for edge in edges:
+            route = env.k.kernel_api.simulation.findRoute(cur_edge, edge).edges
+            if len(route) < min_dist:
+                min_dist = len(route)
+                closest_edge = edge
+        assert closest_edge is not None
+        assert closest_edge in edges
+        return closest_edge
+
+
+    def choose_route(self, env):
+        """See parent class."""
+        veh_id = self.veh_id
+        num_id = int(veh_id[4:])
+        veh_edge = env.k.vehicle.get_edge(veh_id)
+        veh_route = env.k.vehicle.get_route(veh_id)
+        
+        cycle = OuterCycleRouter.CYCLES[num_id & 1]
+        if veh_edge in cycle:
+            idx = cycle.index(veh_edge)
+            next_edge = cycle[(idx + 1) % len(cycle)]
+            next_route = [veh_edge, next_edge]
+        elif veh_route[-1] in cycle:
+            next_route = None
+        else:
+            closest_edge = self._get_closest_edge(veh_edge, cycle, env)
+            closest_route = env.k.kernel_api.simulation.findRoute(veh_edge, closest_edge).edges
+            next_route = list(closest_route)
+
+        # print(veh_id, veh_edge, veh_route, next_route)
+
+        return next_route
+
+
 
 class GridRouter(BaseRouter):
     """A router used to re-route a vehicle in a traffic light grid environment.

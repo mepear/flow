@@ -7,10 +7,10 @@ python train/train.py \
     --lr=2.5e-4 \
     --clip-param=0.2 \
     --value-loss-coef=0.5 \
-    --num-envs=800 \
-    --num-actors=8 \
-    --num-splits=2 \
-    --eval-num-processes=50 \
+    --num-envs=1 \
+    --num-actors=1 \
+    --num-splits=1 \
+    --eval-num-processes=1 \
     --num-steps=500 \
     --num-mini-batch=4 \
     --log-interval=1 \
@@ -21,4 +21,4 @@ python train/train.py \
     --entropy-coef=0.01 \
     --gamma=0.999 \
     --queue-size=5 \
-    --reuse=4
+    --reuse=1
