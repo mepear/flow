@@ -3,6 +3,7 @@ import copy
 import time
 from multiprocessing import Lock
 from functools import partial
+from queue import Queue
 
 import torch
 from torch.distributed import rpc
@@ -91,6 +92,7 @@ class Trainer:
         self.log_lock = Lock()
         self.global_steps = 0
         self.rollout_rewards = torch.zeros(self.n_split, self.n_actor, self.n_env_per_split).float()
+        self.recent_mean = Queue(maxsize=10)
         
         self.buffer = ReplayBuffer(args, self.example_env.observation_space.shape,
             self.example_env.action_space, self.actor_critic.recurrent_hidden_state_size)
@@ -186,7 +188,14 @@ class Trainer:
                 },
                 self.global_steps
             )
-            print("mean reward of rollout from split {}: {}".format(split_id, rewards.mean()))
+            if len(self.recent_mean.queue) == 10:
+                self.recent_mean.get()
+            self.recent_mean.put(rewards.mean())
+            mean_reward = sum(self.recent_mean.queue) / len(self.recent_mean.queue)
+            print("mean reward of rollout from split {}: {:.3f}, running mean {:.3f}".format(\
+                split_id, rewards.mean(), mean_reward))
+            print("running_mean_reward / train_time {:.5f}, time {:.3f} sec".format(\
+                mean_reward / (time.time() - self.start_time), time.time() - self.start_time))
             self.rollout_rewards[split_id] = 0.0
             self.global_steps += self.batch_size
 

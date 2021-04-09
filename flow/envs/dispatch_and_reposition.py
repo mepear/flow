@@ -125,7 +125,7 @@ class DispatchAndRepositionEnv(Env):
             'route': {},
             'location': {}
         }
-        self.last_edge = dict([(taxi, None) for taxi in self.taxis])
+        self.last_edge = dict([(veh_id, None) for veh_id in self.k.vehicle.get_ids()])
 
         self.__dispatched_orders = []
         self.__pending_orders = []
@@ -397,7 +397,7 @@ class DispatchAndRepositionEnv(Env):
             'route': {},
             'location': {}
         }
-        self.last_edge = dict([(taxi, None) for taxi in self.taxis])
+        self.last_edge = dict([(veh_id, None) for veh_id in self.k.vehicle.get_ids()])
         return observation
 
     @property
@@ -451,7 +451,8 @@ class DispatchAndRepositionEnv(Env):
             self.statistics['location']['reposition'] = np.zeros(len(self.edges))
         reposition_stat = self.statistics['location']['reposition']
         if self.__need_reposition:
-            if rl_actions[1] == self.num_taxi or self.taxis[rl_actions[1]] != self.__need_reposition:
+            if not self.__reservations or rl_actions[1] == self.num_taxi or \
+                self.taxis[rl_actions[1]] != self.__need_reposition:
                 # taxi = self.__need_reposition
                 # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
                 # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
@@ -514,6 +515,19 @@ class DispatchAndRepositionEnv(Env):
                 cnt[self.edges.index(edge)] += 1
             self.last_edge[taxi] = edge
 
+        # collect the background vehicle density
+        if 'background' not in self.statistics['route']:
+            self.statistics['route']['background'] = np.zeros((n_edge))
+        cnt = self.statistics['route']['background']
+        for veh in self.k.vehicle.get_ids():
+            if veh in self.taxis:
+                continue
+            edge = self.k.vehicle.get_edge(veh)
+            if edge in self.edges and self.last_edge[veh] != edge:
+                cnt[self.edges.index(edge)] += 1
+            self.last_edge[veh] = edge
+
+
         # collect the pickup vehicle density
         if 'pickup' not in self.statistics['route']:
             self.statistics['route']['pickup'] = \
@@ -547,6 +561,7 @@ class DispatchAndRepositionEnv(Env):
         if self.verbose:
             print('-' * 10, 'un wait', [idx for idx in self.k.person.get_ids() if self.k.person.is_matched(idx) or self.k.person.is_removed(idx)])
             print('-' * 10, 'waiting', [idx for idx in self.k.person.get_ids() if not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
+            print('-' * 10, 'need_reposition', self.__need_reposition)
             print('-' * 10, reward - pre_reward)
 
         for person in self.k.person.get_ids():
