@@ -239,13 +239,14 @@ class Trainer:
         
         for j in range(num_updates):
             self.up_start_time = time.time()
+
+            if self.eval_interval is not None and j % self.eval_interval == 0:
+                self.eval(j)
+            
             if self.use_linear_lr_decay:
                 # decrease learning rate linearly
                 update_linear_schedule(self.agent.optimizer, j, num_updates, self.lr) # TODO: num_updates
 
             self.train(j)
-
-            if self.eval_interval is not None and j % self.eval_interval == 0:
-                self.eval(j)
             
         self.eval_envs.close()

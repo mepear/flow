@@ -526,6 +526,7 @@ class TraCIKernelNetwork(BaseKernelNetwork): # TODO: update kernel api
         subprocess.call(
             netconvert_call,
             stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             shell=True)
 
         # collect data from the generated network configuration file
