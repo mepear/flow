@@ -1,8 +1,8 @@
 python train/eval_myppo.py test-stl-nw-profit-large-out \
-    --experiment-name=test-stl-nw-profit-X1-1-large_test2 \
+    --experiment-name=test-stl-nw-profit-large-out \
     --algo=ppo \
-    --num-processes=1 \
+    --num-processes=100 \
     --verbose \
-    --eval-ckpt=96 \
+    --eval-ckpt=1 \
     --plot-congestion \
     --disable-render-during-eval
