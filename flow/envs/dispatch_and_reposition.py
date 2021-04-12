@@ -210,7 +210,8 @@ class DispatchAndRepositionEnv(Env):
                             torch.load(save_path)
                     else:
                         self.paired_routes = [
-                            [self.k.kernel_api.simulation.findRoute(s, t) for t in self.edges] for s in self.edges
+                            [self.k.kernel_api.simulation.findRoute(s, t) for t in self.edges] \
+                            for s in self.edges
                         ]
                         self.centers = {}
                         for edge1 in self.network.edges:
@@ -218,7 +219,8 @@ class DispatchAndRepositionEnv(Env):
                                 if edge1['to'] == edge2['from']:
                                     self.centers[edge1['id'] + '&' + edge2['id']] = edge1['to']
                         self.paired_complete_routes = [
-                            [_add_center(route.edges) for route in routes] for routes in self.paired_routes
+                            [_add_center(route.edges) for route in routes] \
+                            for routes in self.paired_routes
                         ]
                         self.banned_mid_edges = torch.zeros((n_edge, n_edge, n_edge), dtype=bool)
                         for i in range(n_edge):
@@ -460,7 +462,10 @@ class DispatchAndRepositionEnv(Env):
                 # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
                 if self.verbose:
                     print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
-                self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
+                try:
+                    self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
+                except:
+                    print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
                 reposition_stat[rl_actions[0]] += 1
                 self.__need_reposition = None
         if self.__reservations:
@@ -707,11 +712,10 @@ class DispatchAndRepositionEnv(Env):
         n_taxi = self.num_taxi
 
         # in/out flow edge cannot be visited by taxi
+        flow_edge = []
         for i, edge in enumerate(self.edges):
             if 'flow' in edge:
-                self.action_mask[:, i] = True
-                for j in range(self.n_mid_edge):
-                    self.action_mask[:, n_edge + n_taxi + 1 + j * n_edge + i] = True
+                flow_edge.append(i)
 
         if self.__need_mid_edge is not None:
             res = self.k.vehicle.reservation[self.__need_mid_edge]
@@ -721,6 +725,8 @@ class DispatchAndRepositionEnv(Env):
             for i in range(self.n_mid_edge):
                 self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + from_id] = True
                 self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + to_id] = True
+                for j in flow_edge:
+                    self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + j] = True
 
             if self.n_mid_edge == 0:
                 pass
@@ -760,6 +766,9 @@ class DispatchAndRepositionEnv(Env):
             if cur_edge in self.edges:
                 edge_id = self.edges.index(cur_edge)
                 self.action_mask[i][edge_id] = True
+
+            for j in flow_edge:
+                self.action_mask[i][j] = True
 
             if len(self.__reservations) > 0:
                 res = self.__reservations[0]

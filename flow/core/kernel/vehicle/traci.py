@@ -172,9 +172,10 @@ class TraCIVehicle(KernelVehicle):
                 # collisions
                 vehicle_obs[veh_id] = self.__sumo_obs[veh_id]
             # if veh_id not in self.get_rl_ids():
-            print('update remove', veh_id)
+            
             self.remove(veh_id)
             if 'taxi' in veh_id:
+                print('update remove', veh_id)
                 crash = True
             # remove exiting vehicles from the vehicle subscription if they
             # haven't been removed already

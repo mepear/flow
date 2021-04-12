@@ -104,7 +104,7 @@ class Trainer:
             actor_rref = rpc.remote(name, Actor, args=(i, self.env_fn, self.rref, self.args))
             actor_rref.remote().run()
             self.actor_rrefs.append(actor_rref)
-            time.sleep(10)
+            time.sleep(5)
 
     @rpc.functions.async_execution
     def select_action(self, actor_id, split_id, model_inputs, init=False):
