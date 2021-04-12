@@ -233,7 +233,8 @@ class DispatchAndRepositionEnv(Env):
                                             l2 = len(self.paired_routes[k][j].edges)
                                             r1 = set(self.paired_complete_routes[i][k][:-1])
                                             r2 = set(self.paired_complete_routes[k][j][1:])
-                                            if len(r1 & r2) > 0 or l1 + l2 - 1 > self.max_detour * l:
+                                            if len(r1 & r2) > 0 or l1 + l2 - 1 > self.max_detour * l \
+                                                or l1 == 0 or l2 == 0: # This is for unreachable path
                                                 self.banned_mid_edges[i, j, k] = True
                         torch.save([self.paired_routes, self.paired_complete_routes, self.banned_mid_edges], \
                             save_path)
@@ -462,10 +463,7 @@ class DispatchAndRepositionEnv(Env):
                 # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
                 if self.verbose:
                     print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
-                try:
-                    self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
-                except:
-                    print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
+                self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
                 reposition_stat[rl_actions[0]] += 1
                 self.__need_reposition = None
         if self.__reservations:

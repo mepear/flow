@@ -8,9 +8,9 @@ python train/train.py \
     --clip-param=0.2 \
     --value-loss-coef=0.5 \
     --num-envs=800 \
-    --num-actors=10 \
+    --num-actors=8 \
     --num-splits=2 \
-    --eval-num-processes=50 \
+    --eval-num-processes=1 \
     --num-steps=500 \
     --num-mini-batch=4 \
     --log-interval=1 \
