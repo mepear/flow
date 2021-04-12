@@ -446,3 +446,82 @@ class GridnxmNetwork(Network):
             mapping[node_id] = [left_edge_id, bot_edge_id, right_edge_id, top_edge_id]
 
         return sorted(mapping.items(), key=lambda x: x[0])
+
+
+class GridnxmNetworkInflow(GridnxmNetwork):
+    def specify_nodes(self, net_params):
+        nodes = super().specify_nodes(net_params)
+        if 'inflow' in net_params.additional_params:
+            inflow = net_params.additional_params['inflow']
+            if 'top_left' in inflow:
+                nodes.append({
+                    "id": "center_top_left",
+                    "x": -1. * self.inner_length,
+                    "y": (self.row_num - 1) * self.inner_length,
+                    "type": 'priority',
+                    # "radius": self.inner_nodes_radius
+                })
+                nodes.append({
+                    "id": "center_bot_right",
+                    "x": self.col_num * self.inner_length,
+                    "y": 0.,
+                    "type": 'priority',
+                    # "radius": self.inner_nodes_radius
+                })
+        return nodes
+
+    def specify_edges(self, net_params):
+        edges = super().specify_edges(net_params)
+        if 'inflow' in net_params.additional_params:
+            inflow = net_params.additional_params['inflow']
+            if 'top_left' in inflow:
+                edges.append({
+                        "id": "inflow_top_left",
+                        "type": 'horizontal',
+                        "priority": 78,
+                        "from": "center_top_left",
+                        "to": "center{}".format((self.row_num - 1) * self.col_num),
+                        "length": self.inner_length / self.sub_edge_num
+                    })
+                edges.append({
+                        "id": "outflow_bot_right",
+                        "type": 'horizontal',
+                        "priority": 78,
+                        "from": "center{}".format(self.col_num - 1),
+                        "to": "center_bot_right",
+                        "length": self.inner_length / self.sub_edge_num
+                    })
+        return edges
+    
+    def specify_connections(self, net_params):
+        con_dict = super().specify_connections(net_params)
+        if 'inflow' in net_params.additional_params:
+            inflow = net_params.additional_params['inflow']
+            if 'top_left' in inflow:
+                node_id = "center{}".format((self.row_num - 1) * self.col_num)
+                con_dict[node_id].append({
+                    "from": 'inflow_top_left',
+                    "to": 'left{}_0_0'.format(self.row_num - 1),
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+                con_dict[node_id].append({
+                    "from": 'inflow_top_left',
+                    "to": 'bot{}_1_0'.format(self.row_num - 1),
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+
+                con_dict[node_id].append({
+                    "from": 'bot0_{}_0'.format(self.col_num - 1),
+                    "to": 'outflow_bot_right',
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    }) 
+                con_dict[node_id].append({
+                    "from": 'left1_{}_0'.format(self.row_num - 1),
+                    "to": 'outflow_bot_right',
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+        return con_dict

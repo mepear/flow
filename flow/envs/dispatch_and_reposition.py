@@ -191,6 +191,8 @@ class DispatchAndRepositionEnv(Env):
 
     def _preprocess(self):
         def _add_center(edges):
+            if len(edges) == 0:
+                return []
             ret = []
             for i in range(len(edges) - 1):
                 ret.append(edges[i])
@@ -456,10 +458,10 @@ class DispatchAndRepositionEnv(Env):
                 # taxi = self.__need_reposition
                 # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
                 # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
-                self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
-                reposition_stat[rl_actions[0]] += 1
                 if self.verbose:
                     print('reposition {} to {}, cur_edge {}'.format(self.__need_reposition, self.edges[rl_actions[0]], self.k.vehicle.get_edge(self.__need_reposition)))
+                self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
+                reposition_stat[rl_actions[0]] += 1
                 self.__need_reposition = None
         if self.__reservations:
             if rl_actions[1] < self.num_taxi: # do not dispatch when the special action is selected
@@ -523,7 +525,7 @@ class DispatchAndRepositionEnv(Env):
             if veh in self.taxis:
                 continue
             edge = self.k.vehicle.get_edge(veh)
-            if edge in self.edges and self.last_edge[veh] != edge:
+            if edge in self.edges and (veh not in self.last_edge or self.last_edge[veh] != edge):
                 cnt[self.edges.index(edge)] += 1
             self.last_edge[veh] = edge
 
@@ -703,6 +705,13 @@ class DispatchAndRepositionEnv(Env):
 
         n_edge = len(self.edges)
         n_taxi = self.num_taxi
+
+        # in/out flow edge cannot be visited by taxi
+        for i, edge in enumerate(self.edges):
+            if 'flow' in edge:
+                self.action_mask[:, i] = True
+                for j in range(self.n_mid_edge):
+                    self.action_mask[:, n_edge + n_taxi + 1 + j * n_edge + i] = True
 
         if self.__need_mid_edge is not None:
             res = self.k.vehicle.reservation[self.__need_mid_edge]

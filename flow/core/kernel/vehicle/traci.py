@@ -174,7 +174,8 @@ class TraCIVehicle(KernelVehicle):
             # if veh_id not in self.get_rl_ids():
             print('update remove', veh_id)
             self.remove(veh_id)
-            crash = True
+            if 'taxi' in veh_id:
+                crash = True
             # remove exiting vehicles from the vehicle subscription if they
             # haven't been removed already
             if vehicle_obs[veh_id] is None:

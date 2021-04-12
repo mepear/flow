@@ -1,7 +1,7 @@
 python train/train.py \
-    test-stl-nw-profit-large-out \
-    --experiment-name=test-stl-nw-profit-large-out \
-    --num-env-steps=400000000 \
+    test \
+    --experiment-name=test \
+    --num-env-steps=200000000 \
     --algo=ppo \
     --use-gae \
     --lr=2.5e-4 \

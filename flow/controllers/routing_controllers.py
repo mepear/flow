@@ -138,6 +138,50 @@ class OuterCycleRouter(BaseRouter):
         return next_route
 
 
+class InflowRouter(BaseRouter):
+    """A router used to route vehicles from inflow edge to outflow edge.
+
+    Usage
+    -----
+    See base class for usage example.
+    """
+
+    def choose_route(self, env):
+        assert 'inflow' in self.router_params
+        direction = self.router_params['inflow']
+        if direction == 'top_left':
+            src, dest = 'inflow_top_left', 'outflow_bot_right'
+            src_id, dest_id = env.edges.index(src), env.edges.index(dest)
+        
+
+        vehicles = env.k.vehicle
+        veh_id = self.veh_id
+        veh_edge = vehicles.get_edge(veh_id)
+        if veh_edge[0] == ':':
+            return None
+        veh_edge_id = env.edges.index(veh_edge)
+        veh_route = vehicles.get_route(veh_id)
+        veh_next_edge = env.k.network.next_edge(veh_edge, vehicles.get_lane(veh_id))
+
+        cur_route_len = len(env.paired_routes[veh_edge_id][dest_id].edges)
+
+        next_route = None
+        if veh_route[-1] == veh_edge and veh_next_edge != []:
+            feasible_next_edge = []
+            if veh_next_edge[0][0][0] == ':':
+                next_edge = []
+                for edge in veh_next_edge:
+                    next_edge.append(env.k.network.next_edge(edge[0], edge[1])[0])
+                veh_next_edge = next_edge
+            for edge, _ in veh_next_edge:
+                next_route_len = len(env.paired_routes[env.edges.index(edge)][dest_id].edges)
+                if next_route_len < cur_route_len:
+                    feasible_next_edge.append(edge)
+            next_edge = np.random.choice(feasible_next_edge)
+            next_route = [veh_edge, next_edge]
+
+        return next_route
+
 
 class GridRouter(BaseRouter):
     """A router used to re-route a vehicle in a traffic light grid environment.
