@@ -477,12 +477,17 @@ class DispatchAndRepositionEnv(Env):
                 self.__pending_orders.append([self.__reservations[0], self.taxis[rl_actions[1]]]) # notice that we may dispach a order to a occupied_taxi
         if self.__need_mid_edge:
             mid_edges = [self.edges[edge_id] for edge_id in rl_actions[2:]]
-            self.k.vehicle.pickup(self.__need_mid_edge, mid_edges)
-            res = self.k.vehicle.reservation[self.__need_mid_edge]
-            self.k.person.set_color(res.persons[0], (255, 255, 255)) # White
-            if self.verbose:
-                print('arrange mid edges', mid_edges, 'for', res, 'on', self.__need_mid_edge)
-            self.__need_mid_edge = None
+            if 'flow' not in mid_edges[0]:
+                self.k.vehicle.pickup(self.__need_mid_edge, mid_edges)
+                res = self.k.vehicle.reservation[self.__need_mid_edge]
+                self.k.person.set_color(res.persons[0], (255, 255, 255)) # White
+                if self.verbose:
+                    print('arrange mid edges', mid_edges, 'for', res, 'on', self.__need_mid_edge)
+                self.__need_mid_edge = None
+            else:
+                action_mask = self.get_action_mask()
+                print(action_mask[0, len(self.edges) + len(self.taxis) + 1 + 12], \
+                    action_mask[0, len(self.edges) + len(self.taxis) + 1 + 25])
 
         self._dispatch_taxi()
 
