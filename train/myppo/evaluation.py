@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import os
 import traci
+from functools import partial
 
 from .a2c_ppo_acktr import utils
 from .a2c_ppo_acktr.envs import make_vec_envs
@@ -191,7 +192,7 @@ def get_corners(s, e, w):
     return [s + p, e + p, e - p, s - p]
 
 
-def plot(key1, key2, name, n, m, idx, cmap, tp=None):
+def plot(statistics, edge_position, key1, key2, name, n, m, idx, cmap, tp=None):
     ax = plt.subplot(n, m, idx)
     if tp is None:
         cnts = np.mean([sta[key1][key2] for sta in statistics], axis=0)
@@ -235,46 +236,25 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     plt.ylim(0., 1.)
     plt.savefig(os.path.join(save_path, 'distribution_{}.jpg'.format(ckpt)), dpi=500)
 
+    plotter = partial(plot, statistics, edge_position)
     # route and location
     ## background
-    plot('route', 'background', 'background', 3, 3, 3, cmap)
+    # plotter('route', 'background', 'background', 3, 2, 3, cmap)
     ## free
-    plot('route', 'free', 'free', 3, 3, 7, cmap)
+    plotter('route', 'free', 'free', 2, 2, 3, cmap)
     ## reposition
-    plot('location', 'reposition', 'reposition location', 3, 3, 8, cmap)
+    plotter('location', 'reposition', 'reposition location', 2, 2, 4, cmap)
     ## pickup0
-    plot('route', 'pickup', 'pickup 0', 3, 3, 1, cmap, tp=0)
+    plotter('route', 'pickup', 'pickup 0', 2, 2, 1, cmap, tp=0)
     ## pickup1
-    plot('route', 'pickup', 'pickup 1', 3, 3, 2, cmap, tp=1)
+    # plotter('route', 'pickup', 'pickup 1', 3, 3, 2, cmap, tp=1)
     ## occupied0
-    plot('route', 'occupied', 'occupied 0', 3, 3, 4, cmap, tp=0)
+    plotter('route', 'occupied', 'occupied 0', 2, 2, 2, cmap, tp=0)
     ## occupied1
-    plot('route', 'occupied', 'occupied 1', 3, 3, 5, cmap, tp=1)
+    # plotter('route', 'occupied', 'occupied 1', 3, 3, 5, cmap, tp=1)
 
     plt.suptitle('routes_and_locations from ckpt {}'.format(ckpt), y=0.00)
     plt.tight_layout()
     plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.jpg'.format(ckpt)), \
         dpi=500, bbox_inches='tight')
-
-    # # location
-    # ## pickup
-    # ax = plt.subplot(2, 1, 1)
-    # poses = sum((sta['location']['pickup'] for sta in statistics), [])
-    # plt.scatter(*zip(*poses))
-    # plt.xlim(-5., 160.)
-    # plt.ylim(-5., 160.)
-    # plt.title('pickup location')
-    # plt.xticks([]), plt.yticks([])
-
-    # ## reposition
-    # ax = plt.subplot(2, 1, 2)
-    # poses = sum((sta['location']['reposition'] for sta in statistics), [])
-    # plt.scatter(*zip(*poses), s=2)
-    # plt.xlim(-5., 160.)
-    # plt.ylim(-5., 160.)
-    # plt.title('reposition location')
-    # plt.xticks([]), plt.yticks([])
-
-    # plt.tight_layout()
-    # plt.savefig(os.path.join(save_path, 'locations.jpg'), dpi=500)
     
