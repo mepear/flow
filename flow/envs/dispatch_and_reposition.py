@@ -842,6 +842,15 @@ class DispatchAndRepositionEnv(Env):
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, self.inner_length - 20)
             self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
+        elif self.distribution == 'mode-14':
+            idx = self.k.person.total
+            rn =  np.random.rand()
+            edge_id1 = np.random.choice(['bot3_1_0', 'top3_1_0', 'left3_0_0', 'right3_0_0', \
+                'left3_1_0', 'right3_1_0', 'top2_1_0', 'bot2_1_0'])
+            edge_id2 = 'left1_3_0' if rn < 0.5 else 'bot0_3_0'
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(20, self.inner_length - 20)
+            self.k.person.add_request(per_id, edge_id1, edge_id2, pos)
         elif self.distribution == 'mode-X':
             # the request only appears at one edge
             idx = self.k.person.total

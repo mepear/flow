@@ -8,7 +8,7 @@ from flow.core.params import SumoCarFollowingParams, SumoLaneChangeParams
 from flow.core.params import InFlows
 # from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
 from flow.envs.dispatch_and_reposition import DispatchAndRepositionEnv, ADDITIONAL_ENV_PARAMS
-from flow.networks import GridnxmNetwork, GridnxmNetworkInflow
+from flow.networks import GridnxmNetworkInflow
 
 v_enter = 10
 inner_length = 50
@@ -123,7 +123,7 @@ additional_net_params = {
 }
 
 inflows = InFlows()
-inflows.add('inflow_top_left', 'inflow_top_left', probability=0.1, depart_speed='random', \
+inflows.add('inflow_top_left', 'inflow_top_left', probability=0.2, depart_speed='random', \
     name='inflow_top_left')
 
 initial_config, net_params = get_non_flow_params(
@@ -133,14 +133,14 @@ initial_config, net_params = get_non_flow_params(
 
 additional_params = ADDITIONAL_ENV_PARAMS.copy()
 additional_params["time_price"] = 0.02
-additional_params["distance_price"] = 0.02
+additional_params["distance_price"] = 0.005
 additional_params["pickup_price"] = 1
 additional_params["wait_penalty"] = 0.000
 additional_params["tle_penalty"] = 0.02
 additional_params["person_prob"] = 0.06
-additional_params["max_waiting_time"] = 30
+additional_params["max_waiting_time"] = 20
 additional_params["free_pickup_time"] = 0.0
-additional_params["distribution"] = 'mode-13'
+additional_params["distribution"] = 'mode-14'
 additional_params["n_mid_edge"] = 1
 flow_params = dict(
     # name of the experiment

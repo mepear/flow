@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
-def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
-    save_path=None, writer=None, total_num_steps=None, do_plot_congestion=False, ckpt=None):
+def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=None, writer=None, \
+    total_num_steps=None, do_plot_congestion=False, ckpt=None, verbose=False):
     # # flow_params['sim'].render = True
     # eval_envs = make_vec_envs(env_name, seed, num_processes,
     #                           None, eval_log_dir, device, True, flow_params=flow_params, port=port, verbose=verbose)
@@ -87,11 +87,10 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
         with open(os.path.join(save_path, 'eval.txt'), 'a') as f:
             f.write(" Evaluation using {} episodes: mean reward {:.5f}\n".format(
             len(eval_episode_rewards), np.mean(eval_episode_rewards)))
-    if writer:
-        assert total_num_steps is not None
-        # writer.add_scalar('rewards/eval', np.mean(eval_episode_rewards), total_num_steps)
-        denom = np.array(nums_complete_orders, dtype=int)
-        denom2 = np.array(nums_orders, dtype=int)
+    # writer.add_scalar('rewards/eval', np.mean(eval_episode_rewards), total_num_steps)
+    denom = np.array(nums_complete_orders, dtype=int)
+    denom2 = np.array(nums_orders, dtype=int)
+    if writer and total_num_steps:
         writer.add_scalars(
                 "rewards/eval", 
                 {
@@ -102,6 +101,10 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                 },
             total_num_steps
             )
+    if verbose: 
+        print('rewards/eval mean {:.2f} median {:.2f}'.format(\
+            np.mean(eval_episode_rewards), np.median(eval_episode_rewards)))
+    if writer and total_num_steps:
         writer.add_scalars(
                 "eval/order", 
                 {
@@ -112,8 +115,12 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                 },
             total_num_steps
             )
-        if not np.alltrue(denom == 0):
-            array = np.ma.masked_invalid(total_pickup_distances / denom)
+    if verbose: 
+        print('eval/order mean {:.2f} median {:.2f}'.format(\
+            np.mean(nums_complete_orders), np.median(nums_complete_orders)))
+    if not np.alltrue(denom == 0):
+        array = np.ma.masked_invalid(total_pickup_distances / denom)
+        if writer and total_num_steps:
             writer.add_scalars(
                     "eval/pickup_distance", 
                     {
@@ -124,7 +131,11 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                     },
                 total_num_steps
                 )
-            array = np.ma.masked_invalid(total_pickup_times / denom)
+        if verbose: 
+            print('eval/pickup_distance mean {:.2f} median {:.2f}'.format(\
+                np.nanmean(array), np.nanmedian(array)))
+        array = np.ma.masked_invalid(total_pickup_times / denom)
+        if writer and total_num_steps:
             writer.add_scalars(
                     "eval/pickup_time", 
                     {
@@ -135,7 +146,11 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                     },
                 total_num_steps
                 )
-            array = np.ma.masked_invalid(total_valid_distances / denom)
+        if verbose: 
+            print('eval/pickup_time mean {:.2f} median {:.2f}'.format(\
+                np.nanmean(array), np.nanmedian(array)))
+        array = np.ma.masked_invalid(total_valid_distances / denom)
+        if writer and total_num_steps:
             writer.add_scalars(
                     "eval/valid_distance", 
                     {
@@ -146,7 +161,11 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                     },
                 total_num_steps
                 )
-            array = np.ma.masked_invalid(total_valid_times / denom)
+        if verbose: 
+            print('eval/valid_distance mean {:.2f} median {:.2f}'.format(\
+                np.nanmean(array), np.nanmedian(array)))
+        array = np.ma.masked_invalid(total_valid_times / denom)
+        if writer and total_num_steps:
             writer.add_scalars(
                     "eval/valid_time", 
                     {
@@ -157,8 +176,12 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                     },
                 total_num_steps
                 )
-        if not np.alltrue(denom2 == 0):
-            array = np.ma.masked_invalid(total_wait_times / denom2)
+        if verbose: 
+            print('eval/valid_time mean {:.2f} median {:.2f}'.format(\
+                np.nanmean(array), np.nanmedian(array)))
+    if not np.alltrue(denom2 == 0):
+        array = np.ma.masked_invalid(total_wait_times / denom2)
+        if writer and total_num_steps:
             writer.add_scalars(
                     "eval/wait_time", 
                     {
@@ -169,6 +192,10 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                     },
                 total_num_steps
                 )
+        if verbose: 
+            print('eval/wait_time mean {:.2f} median {:.2f}'.format(\
+                np.nanmean(array), np.nanmedian(array)))
+    if writer and total_num_steps:
         writer.add_scalars(
                 "eval/congestion_rate", 
                 {
@@ -179,6 +206,9 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, \
                 },
             total_num_steps
             )
+    if verbose: 
+        print('eval/congestion_rate mean {:.2f} median {:.2f}'.format(\
+            np.mean(total_congestion_rates), np.median(total_congestion_rates)))
     
     if do_plot_congestion:
         plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
@@ -201,19 +231,23 @@ def plot(statistics, edge_position, key1, key2, name, n, m, idx, cmap, tp=None):
     cnts /= cnts.max()
     colors = []
     patches = []
+    x_min, x_max, y_min, y_max = 1e9, -1e9, 1e9, -1e9
     for cnt, (start, end, width) in zip(cnts, edge_position):
         vertices = get_corners(start, end, width)
         assert cnt >= 0 and cnt <= 1
         poly = Polygon(vertices)
         colors.append(cnt)
         patches.append(poly)
+        for vertex in vertices:
+            x_min, y_min = min(x_min, vertex[0]), min(y_min, vertex[1])
+            x_max, y_max = max(x_max, vertex[0]), max(y_max, vertex[1])
     colors = np.array(colors) * 100
     p = PatchCollection(patches)
     p.set_cmap(cmap)
     p.set_array(colors)
     ax.add_collection(p)
-    plt.xlim(-5., 160.)
-    plt.ylim(-5., 160.)
+    plt.xlim(x_min - 5, x_max + 5)
+    plt.ylim(y_min - 5, y_max + 5)
     plt.title(name)
     plt.xticks([]), plt.yticks([])
 
