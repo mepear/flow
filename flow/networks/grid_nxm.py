@@ -456,18 +456,51 @@ class GridnxmNetworkInflow(GridnxmNetwork):
             if 'top_left' in inflow:
                 nodes.append({
                     "id": "center_top_left",
-                    "x": -1. * self.inner_length,
+                    "x": -.5 * self.inner_length,
                     "y": (self.row_num - 1) * self.inner_length,
                     "type": 'priority',
                     # "radius": self.inner_nodes_radius
                 })
                 nodes.append({
                     "id": "center_bot_right",
-                    "x": self.col_num * self.inner_length,
+                    "x": (self.col_num - 0.5) * self.inner_length,
                     "y": 0.,
                     "type": 'priority',
                     # "radius": self.inner_nodes_radius
                 })
+            if 'midtop_left' in inflow:
+                nodes.append({
+                    "id": "center_midtop_left",
+                    "x": -.5 * self.inner_length,
+                    "y": (self.row_num - 2) * self.inner_length,
+                    "type": 'priority',
+                    # "radius": self.inner_nodes_radius
+                })
+            if 'midbot_left' in inflow:
+                nodes.append({
+                    "id": "center_midbot_left",
+                    "x": -.5 * self.inner_length,
+                    "y": (self.row_num - 3) * self.inner_length,
+                    "type": 'priority',
+                    # "radius": self.inner_nodes_radius
+                })
+            if 'top_midleft' in inflow:
+                nodes.append({
+                    "id": "center_top_midleft",
+                    "x": self.inner_length,
+                    "y": (self.row_num - 0.5) * self.inner_length,
+                    "type": 'priority',
+                    # "radius": self.inner_nodes_radius
+                })
+            if 'top_midright' in inflow:
+                nodes.append({
+                    "id": "center_top_midright",
+                    "x": 2. * self.inner_length,
+                    "y": (self.row_num - 0.5) * self.inner_length,
+                    "type": 'priority',
+                    # "radius": self.inner_nodes_radius
+                })
+                
         return nodes
 
     def specify_edges(self, net_params):
@@ -481,7 +514,7 @@ class GridnxmNetworkInflow(GridnxmNetwork):
                         "priority": 78,
                         "from": "center_top_left",
                         "to": "center{}".format((self.row_num - 1) * self.col_num),
-                        "length": self.inner_length / self.sub_edge_num
+                        "length": self.inner_length / self.sub_edge_num / 2
                     })
                 edges.append({
                         "id": "outflow_bot_right",
@@ -489,8 +522,44 @@ class GridnxmNetworkInflow(GridnxmNetwork):
                         "priority": 78,
                         "from": "center{}".format(self.col_num - 1),
                         "to": "center_bot_right",
-                        "length": self.inner_length / self.sub_edge_num
+                        "length": self.inner_length / self.sub_edge_num / 2
                     })
+            if 'midtop_left' in inflow:
+                edges.append({
+                    "id": "inflow_midtop_left",
+                    "type": "horizontal",
+                    "priority": 78,
+                    "from": "center_midtop_left",
+                    "to": "center{}".format((self.row_num - 2) * self.col_num),
+                    "length": self.inner_length / self.sub_edge_num / 2
+                })
+            if 'midbot_left' in inflow:
+                edges.append({
+                    "id": "inflow_midbot_left",
+                    "type": "horizontal",
+                    "priority": 78,
+                    "from": "center_midbot_left",
+                    "to": "center{}".format((self.row_num - 3) * self.col_num),
+                    "length": self.inner_length / self.sub_edge_num / 2
+                })
+            if 'top_midleft' in inflow:
+                edges.append({
+                    "id": "inflow_top_midleft",
+                    "type": "vertical",
+                    "priority": 78,
+                    "from": "center_top_midleft",
+                    "to": "center{}".format((self.row_num - 1) * self.col_num + 1),
+                    "length": self.inner_length / self.sub_edge_num / 2
+                })
+            if 'top_midright' in inflow:
+                edges.append({
+                    "id": "inflow_top_midright",
+                    "type": "vertical",
+                    "priority": 78,
+                    "from": "center_top_midright",
+                    "to": "center{}".format((self.row_num - 1) * self.col_num + 2),
+                    "length": self.inner_length / self.sub_edge_num / 2
+                })
         return edges
     
     def specify_connections(self, net_params):
@@ -521,6 +590,62 @@ class GridnxmNetworkInflow(GridnxmNetwork):
                 con_dict[node_id].append({
                     "from": 'left1_{}_0'.format(self.row_num - 1),
                     "to": 'outflow_bot_right',
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+            if 'midtop_left' in inflow:
+                node_id = "center{}".format((self.row_num - 2) * self.col_num)
+                con_dict[node_id].append({
+                    "from": 'inflow_midtop_left',
+                    "to": 'left{}_0_0'.format(self.row_num - 2),
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+                con_dict[node_id].append({
+                    "from": 'inflow_midtop_left',
+                    "to": 'bot{}_1_0'.format(self.row_num - 2),
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+            if 'midbot_left' in inflow:
+                node_id = "center{}".format((self.row_num - 3) * self.col_num)
+                con_dict[node_id].append({
+                    "from": 'inflow_midbot_left',
+                    "to": 'left{}_0_0'.format(self.row_num - 3),
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+                con_dict[node_id].append({
+                    "from": 'inflow_midbot_left',
+                    "to": 'bot{}_1_0'.format(self.row_num - 3),
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+            if 'top_midleft' in inflow:
+                node_id = "center{}".format((self.row_num - 1) * self.col_num + 1)
+                con_dict[node_id].append({
+                    "from": 'inflow_top_midleft',
+                    "to": 'left{}_1_0'.format(self.row_num - 1),
+                    "fromLane": str(0),
+                    "toLane": str(0),                      
+                    })
+                con_dict[node_id].append({
+                    "from": 'inflow_top_midleft',
+                    "to": 'bot{}_2_0'.format(self.row_num - 1),
+                    "fromLane": str(0),
+                    "toLane": str(0),                        
+                    })
+            if 'top_midright' in inflow:
+                node_id = "center{}".format((self.row_num - 1) * self.col_num + 2)
+                con_dict[node_id].append({
+                    "from": 'inflow_top_midright',
+                    "to": 'left{}_2_0'.format(self.row_num - 1),
+                    "fromLane": str(0),
+                    "toLane": str(0),                      
+                    })
+                con_dict[node_id].append({
+                    "from": 'inflow_top_midright',
+                    "to": 'bot{}_3_0'.format(self.row_num - 1),
                     "fromLane": str(0),
                     "toLane": str(0),                        
                     })
