@@ -9,6 +9,7 @@ from flow.core.params import InFlows
 # from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
 from flow.envs.dispatch_and_reposition import DispatchAndRepositionEnv, ADDITIONAL_ENV_PARAMS
 from flow.networks import GridnxmNetworkInflow
+from flow.utils.trafficlights import get_phase
 
 v_enter = 10
 inner_length = 50
@@ -87,31 +88,19 @@ vehicles.add(
     is_taxi=False)
 
 tl_logic = TrafficLightParams(baseline=False)
-phases = [{
-    "duration": "10",
-    "minDur": "10",
-    "maxDur": "10",
-    "state": "GGggrrrrGGggrrrr"
-}, {
-    "duration": "1",
-    "minDur": "1",
-    "maxDur": "1",
-    "state": "yyyyrrrryyyyrrrr"
-}, {
-    "duration": "10",
-    "minDur": "10",
-    "maxDur": "10",
-    "state": "rrrrGGggrrrrGGgg"
-}, {
-    "duration": "1",
-    "minDur": "1",
-    "maxDur": "1",
-    "state": "rrrryyyyrrrryyyy"
-}]
-tl_logic.add("center9", phases=phases)
-tl_logic.add("center10", phases=phases)
-tl_logic.add("center5", phases=phases)
-tl_logic.add("center6", phases=phases)
+interval = [10., 1.]
+tl_logic.add("center1", phases=get_phase('bottom', interval))
+tl_logic.add("center2", phases=get_phase('bottom', interval))
+tl_logic.add("center4", phases=get_phase('left_in', interval))
+tl_logic.add("center5", phases=get_phase('center', interval))
+tl_logic.add("center6", phases=get_phase('center', interval))
+tl_logic.add("center7", phases=get_phase('right', interval))
+tl_logic.add("center8", phases=get_phase('left', interval))
+tl_logic.add("center9", phases=get_phase('center', interval))
+tl_logic.add("center10", phases=get_phase('center', interval))
+tl_logic.add("center11", phases=get_phase('right', interval))
+tl_logic.add("center13", phases=get_phase('top', interval))
+tl_logic.add("center14", phases=get_phase('top_in', interval))
 
 additional_net_params = {
     "grid_array": grid_array,
@@ -123,15 +112,15 @@ additional_net_params = {
 }
 
 inflows = InFlows()
-inflows.add('inflow_top_left', 'inflow', probability=0.2, depart_speed='random', \
+inflows.add('inflow_top_left', 'inflow', probability=0.1, depart_speed='random', \
     name='inflow_top_left')
 # inflows.add('inflow_midtop_left', 'inflow', probability=0.2, depart_speed='random', \
 #     name='inflow_midtop_left')
-inflows.add('inflow_midbot_left', 'inflow', probability=0.2, depart_speed='random', \
+inflows.add('inflow_midbot_left', 'inflow', probability=0.1, depart_speed='random', \
     name='inflow_midbot_left')
 # inflows.add('inflow_top_midleft', 'inflow', probability=0.2, depart_speed='random', \
 #     name='inflow_top_midleft')
-inflows.add('inflow_top_midright', 'inflow', probability=0.2, depart_speed='random', \
+inflows.add('inflow_top_midright', 'inflow', probability=0.1, depart_speed='random', \
     name='inflow_top_midright')
 
 initial_config, net_params = get_non_flow_params(
