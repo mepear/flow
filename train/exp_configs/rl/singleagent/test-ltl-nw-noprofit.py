@@ -89,9 +89,9 @@ vehicles.add(
 
 tl_logic = TrafficLightParams(baseline=False)
 phases = [{
-    "duration": "25",
-    "minDur": "25",
-    "maxDur": "25",
+    "duration": "40",
+    "minDur": "40",
+    "maxDur": "40",
     "state": "GGggrrrrGGggrrrr"
 }, {
     "duration": "1",

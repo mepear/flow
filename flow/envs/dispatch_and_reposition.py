@@ -322,11 +322,12 @@ class DispatchAndRepositionEnv(Env):
                 phase = tl.getPhase(tl_id)
                 t_next = tl.getNextSwitch(tl_id)
                 links = tl.getControlledLinks(tl_id)
-                logic = tl.getAllProgramLogics(tl_id)[0]
+                logic = tl.getAllProgramLogics(tl_id)[-1]
                 state = tl.getRedYellowGreenState(tl_id)
 
-                ft = [0] * (len(logic.phases) + 1)
-                ft[phase] = 1
+                len_phases = 4 # TODO: len(logic.phases)
+                ft = [0] * (len_phases + 1)
+                ft[phase % len_phases] = 1
 
                 durations = [phase.duration for phase in logic.phases]
                 cur_time = self.time_counter * self.sim_params.sim_step

@@ -1,8 +1,24 @@
+import numpy as np
+
 def get_phase(name, ts):
     phases = all_phases[name]
     for i, phase in enumerate(phases):
         phase['duration'] = phase['minDur'] = phase['maxDur'] = str(ts[i % len(ts)])
     return phases
+
+def get_uniform_random_phase(name, means, noises, T=500):
+    i, acc_t = 0, 0
+    phases = []
+    while acc_t <= T:
+        mean, noise = means[i % len(means)], noises[i % len(noises)]
+        phase = all_phases[name][i % len(all_phases[name])]
+        t = np.random.rand() * 2 * noise * mean + mean * (1 - noise)
+        phase['duration'] = phase['minDur'] = phase['maxDur'] = str(t)
+        phases.append(phase)
+        acc_t += t
+        i += 1
+    return phases
+
 
 all_phases = {}
 

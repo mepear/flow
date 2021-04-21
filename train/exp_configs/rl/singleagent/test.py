@@ -8,12 +8,14 @@ from flow.core.params import SumoCarFollowingParams, SumoLaneChangeParams
 from flow.core.params import InFlows
 # from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
 from flow.envs.dispatch_and_reposition import DispatchAndRepositionEnv, ADDITIONAL_ENV_PARAMS
-from flow.networks import GridnxmNetworkInflow
+from flow.networks import GridnxmNetwork
+from flow.utils.trafficlights import get_uniform_random_phase
 
 v_enter = 10
 inner_length = 50
 n_rows = 4
 n_columns = 4
+horizon = 500
 
 grid_array = {
     "inner_length": inner_length,
@@ -22,7 +24,7 @@ grid_array = {
     "sub_edge_num": 1
 }
 
-def get_non_flow_params(enter_speed, inflows, add_net_params):
+def get_non_flow_params(enter_speed, add_net_params, inflows=None):
     """Define the network and initial params in the absence of inflows.
 
     Note that when a vehicle leaves a network in this case, it is immediately
@@ -87,31 +89,11 @@ vehicles.add(
     is_taxi=False)
 
 tl_logic = TrafficLightParams(baseline=False)
-phases = [{
-    "duration": "10",
-    "minDur": "10",
-    "maxDur": "10",
-    "state": "GGggrrrrGGggrrrr"
-}, {
-    "duration": "1",
-    "minDur": "1",
-    "maxDur": "1",
-    "state": "yyyyrrrryyyyrrrr"
-}, {
-    "duration": "10",
-    "minDur": "10",
-    "maxDur": "10",
-    "state": "rrrrGGggrrrrGGgg"
-}, {
-    "duration": "1",
-    "minDur": "1",
-    "maxDur": "1",
-    "state": "rrrryyyyrrrryyyy"
-}]
-tl_logic.add("center9", phases=phases)
-tl_logic.add("center10", phases=phases)
-tl_logic.add("center5", phases=phases)
-tl_logic.add("center6", phases=phases)
+phases = get_uniform_random_phase('center', means=[10.0, 1.0, 10.0, 1.0], noises=[0.5], T=horizon)
+tl_logic.add("center9", programID=10, phases=phases)
+tl_logic.add("center10", programID=10, phases=phases)
+tl_logic.add("center5", programID=10, phases=phases)
+tl_logic.add("center6", programID=10, phases=phases)
 
 additional_net_params = {
     "grid_array": grid_array,
@@ -119,24 +101,24 @@ additional_net_params = {
     "horizontal_lanes": 1,
     "vertical_lanes": 1,
     "print_warnings": False, # warnings in building net
-    "inflow": ['top_left', 'midbot_left', 'top_midright']
+    # "inflow": ['top_left', 'midbot_left', 'top_midright']
 }
 
-inflows = InFlows()
-inflows.add('inflow_top_left', 'inflow', probability=0.2, depart_speed='random', \
-    name='inflow_top_left')
-# inflows.add('inflow_midtop_left', 'inflow', probability=0.2, depart_speed='random', \
-#     name='inflow_midtop_left')
-inflows.add('inflow_midbot_left', 'inflow', probability=0.2, depart_speed='random', \
-    name='inflow_midbot_left')
-# inflows.add('inflow_top_midleft', 'inflow', probability=0.2, depart_speed='random', \
-#     name='inflow_top_midleft')
-inflows.add('inflow_top_midright', 'inflow', probability=0.2, depart_speed='random', \
-    name='inflow_top_midright')
+# inflows = InFlows()
+# inflows.add('inflow_top_left', 'inflow', probability=0.2, depart_speed='random', \
+#     name='inflow_top_left')
+# # inflows.add('inflow_midtop_left', 'inflow', probability=0.2, depart_speed='random', \
+# #     name='inflow_midtop_left')
+# inflows.add('inflow_midbot_left', 'inflow', probability=0.2, depart_speed='random', \
+#     name='inflow_midbot_left')
+# # inflows.add('inflow_top_midleft', 'inflow', probability=0.2, depart_speed='random', \
+# #     name='inflow_top_midleft')
+# inflows.add('inflow_top_midright', 'inflow', probability=0.2, depart_speed='random', \
+#     name='inflow_top_midright')
 
 initial_config, net_params = get_non_flow_params(
     enter_speed=v_enter,
-    inflows=inflows,
+    # inflows=inflows,
     add_net_params=additional_net_params)
 
 additional_params = ADDITIONAL_ENV_PARAMS.copy()
@@ -150,6 +132,7 @@ additional_params["max_waiting_time"] = 20
 additional_params["free_pickup_time"] = 0.0
 additional_params["distribution"] = 'mode-13'
 additional_params["n_mid_edge"] = 1
+additional_params["use_tl"] = True
 flow_params = dict(
     # name of the experiment
     exp_tag='grid-intersection',
@@ -158,7 +141,7 @@ flow_params = dict(
     env_name=DispatchAndRepositionEnv,
 
     # name of the network class the experiment is running on
-    network=GridnxmNetworkInflow,
+    network=GridnxmNetwork,
 
     # simulator that is used by the experiment
     simulator='traci',
@@ -175,7 +158,7 @@ flow_params = dict(
     # environment related parameters (see flow.core.params.EnvParams)
 
     env=EnvParams(
-        horizon=500,
+        horizon=horizon,
         additional_params=additional_params,
     ),
 

@@ -1,8 +1,8 @@
-python train/eval_myppo.py test-stl-nw-profit-large-flow-more \
-    --experiment-name=test-stl-nw-profit-large-flow-more \
+python train/eval_myppo.py test-ltl-nw-profit-large \
+    --experiment-name=test-ltl-nw-profit-large \
     --algo=ppo \
-    --num-processes=1 \
+    --num-processes=100 \
     --verbose \
-    --eval-ckpt=0 \
-    --disable-render-during-eval # \
-    # --plot-congestion \
+    --eval-ckpt=135 \
+    --disable-render-during-eval \
+    --plot-congestion
