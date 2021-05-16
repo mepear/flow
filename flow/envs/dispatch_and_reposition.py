@@ -543,7 +543,7 @@ class DispatchAndRepositionEnv(Env):
         # collect the pickup vehicle density
         if 'pickup' not in self.statistics['route']:
             self.statistics['route']['pickup'] = \
-                np.zeros((1 if 'mode-X' not in self.distribution else 2, n_edge))
+                np.zeros((1 if 'mode-X' not in self.distribution else 3, n_edge))
         cnt = self.statistics['route']['pickup']
         for taxi in pickup_taxi:
             edge = self.k.vehicle.get_edge(taxi)
@@ -555,7 +555,7 @@ class DispatchAndRepositionEnv(Env):
         # collect the on-service vehicle density
         if 'occupied' not in self.statistics['route']:
             self.statistics['route']['occupied'] = \
-                np.zeros((1 if 'mode-X' not in self.distribution else 2, n_edge))
+                np.zeros((1 if 'mode-X' not in self.distribution else 3, n_edge))
         cnt = self.statistics['route']['occupied']
         for taxi in occupied_taxi:
             edge = self.k.vehicle.get_edge(taxi)
@@ -814,7 +814,7 @@ class DispatchAndRepositionEnv(Env):
         remain_pending_orders = []
 
         if 'pickup' not in self.statistics['location']:
-            self.statistics['location']['pickup'] = [[], []] if 'mode-X' in self.distribution else [[]]
+            self.statistics['location']['pickup'] = [[], [], []] if 'mode-X' in self.distribution else [[]]
         pickup_stat = self.statistics['location']['pickup']
         for res, veh_id in self.__pending_orders:
             # there would be some problems if the a taxi is on the road started with ":"

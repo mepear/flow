@@ -112,6 +112,23 @@ def gen_request(env):
             tp = 1
         per_id = 'per_' + str(idx)
         pos = np.random.uniform(20, env.inner_length - 20)
+    elif env.distribution == 'mode-X3':
+        idx = env.k.person.total
+        rn, rn2 =  np.random.rand(), np.random.rand()
+        if rn < 1 / 3:
+            edge_id1 = 'bot3_1_0'
+            edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+            tp = 0
+        elif rn < 2 / 3:
+            edge_id1 = 'bot2_1_0'
+            edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+            tp = 1
+        else:
+            edge_id1 = 'bot1_1_0'
+            edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+            tp = 2
+        per_id = 'per_' + str(idx)
+        pos = np.random.uniform(20, env.inner_length - 20)
     elif env.distribution == 'mode-2':
         # the request only appears at two different edges
         idx = env.k.person.total

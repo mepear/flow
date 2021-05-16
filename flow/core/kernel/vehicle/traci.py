@@ -28,6 +28,20 @@ rdelta = 255 / STEPS
 color_bins = [[int(255 - rdelta * i), int(rdelta * i), 0] for i in
               range(STEPS + 1)]
 
+LIGHT_RED = (255, 153, 153)
+DEEP_RED = (255, 0, 0)
+
+LIGHT_BROWN = (255, 204, 153)
+DEEP_BROWN = (255, 128, 0)
+
+LIGHT_BLUE = (153, 204, 255)
+DEEP_BLUE = (0, 128, 255)
+
+TYPE_COLOR = [
+    [LIGHT_RED, DEEP_RED],
+    [LIGHT_BLUE, DEEP_BLUE],
+    [LIGHT_BROWN, DEEP_BROWN]
+]
 
 class TraCIVehicle(KernelVehicle):
     """Flow kernel for the TraCI API.
@@ -1109,10 +1123,11 @@ class TraCIVehicle(KernelVehicle):
                     if veh_id in free:
                         color = GREEN
                     else:
-                        if veh_id in pickup:
-                            color = YELLOW if self.__types[veh_id] == 0 else CYAN
-                        else:
-                            color = ORANGE if self.__types[veh_id] == 0 else CYANP
+                        color = TYPE_COLOR[self.__types[veh_id]][int(veh_id not in pickup)]
+                        # if veh_id in pickup:
+                        #     color = YELLOW if self.__types[veh_id] == 0 else CYAN
+                        # else:
+                        #     color = ORANGE if self.__types[veh_id] == 0 else CYANP
                     # color = (GREEN if veh_id in free else ORANGE) if veh_id not in pickup else YELLOW
                     # If vehicle is already being colored via argument to vehicles.add(), don't re-color it.
                     if self._force_color_update or 'color' not in \

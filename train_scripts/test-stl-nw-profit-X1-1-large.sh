@@ -1,14 +1,14 @@
 python train/train.py \
     test-stl-nw-profit-X1-1-large \
     --experiment-name=test-stl-nw-profit-X1-1-large \
-    --num-env-steps=400000000 \
+    --num-env-steps=1600000000 \
     --algo=ppo \
     --use-gae \
     --lr=2.5e-4 \
-    --clip-param=0.1 \
+    --clip-param=0.2 \
     --value-loss-coef=0.5 \
-    --num-envs=200 \
-    --num-actors=4 \
+    --num-envs=800 \
+    --num-actors=8 \
     --num-splits=2 \
     --eval-num-processes=50 \
     --num-steps=500 \
@@ -21,4 +21,4 @@ python train/train.py \
     --entropy-coef=0.01 \
     --gamma=0.999 \
     --queue-size=5 \
-    --reuse=1
+    --reuse=4
