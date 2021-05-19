@@ -252,6 +252,33 @@ def plot(statistics, edge_position, key1, key2, name, n, m, idx, cmap, tp=None):
     plt.xticks([]), plt.yticks([])
 
 
+def draw(plotter, n_tp, cmap, ckpt, save_path):
+    # route and location
+    ## background
+    # plotter('route', 'background', 'background', 3, 2, 3, cmap)
+    ## free
+    plotter('route', 'free', 'free', 2, n_tp + 1, n_tp + 1, cmap)
+    ## reposition
+    plotter('location', 'reposition', 'reposition location', 2, n_tp + 1, 2 * n_tp + 2, cmap)
+
+    for i in range(n_tp):
+        plotter('route', 'pickup', 'pickup {}'.format(i), 2, n_tp + 1, i + 1, cmap, tp=i)
+        plotter('route', 'occupied', 'occupied {}'.format(i), 2, n_tp + 1, i + n_tp + 2, cmap, tp=i)
+    ## pickup0
+    # plotter('route', 'pickup', 'pickup 0', 2, 2, 1, cmap, tp=0)
+    ## pickup1
+    # plotter('route', 'pickup', 'pickup 1', 3, 3, 2, cmap, tp=1)
+    ## occupied0
+    # plotter('route', 'occupied', 'occupied 0', 2, 2, 2, cmap, tp=0)
+    ## occupied1
+    # plotter('route', 'occupied', 'occupied 1', 3, 3, 5, cmap, tp=1)
+
+    plt.suptitle('routes_and_locations from ckpt {}'.format(ckpt), y=0.00)
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.jpg'.format(ckpt)), \
+        dpi=500, bbox_inches='tight')
+
+
 def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt):
     fig, ax = plt.subplots()
     cmap = plt.get_cmap('Greys')
@@ -271,24 +298,5 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     plt.savefig(os.path.join(save_path, 'distribution_{}.jpg'.format(ckpt)), dpi=500)
 
     plotter = partial(plot, statistics, edge_position)
-    # route and location
-    ## background
-    # plotter('route', 'background', 'background', 3, 2, 3, cmap)
-    ## free
-    plotter('route', 'free', 'free', 2, 2, 3, cmap)
-    ## reposition
-    plotter('location', 'reposition', 'reposition location', 2, 2, 4, cmap)
-    ## pickup0
-    plotter('route', 'pickup', 'pickup 0', 2, 2, 1, cmap, tp=0)
-    ## pickup1
-    # plotter('route', 'pickup', 'pickup 1', 3, 3, 2, cmap, tp=1)
-    ## occupied0
-    plotter('route', 'occupied', 'occupied 0', 2, 2, 2, cmap, tp=0)
-    ## occupied1
-    # plotter('route', 'occupied', 'occupied 1', 3, 3, 5, cmap, tp=1)
-
-    plt.suptitle('routes_and_locations from ckpt {}'.format(ckpt), y=0.00)
-    plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.jpg'.format(ckpt)), \
-        dpi=500, bbox_inches='tight')
+    draw(plotter, 3, cmap, ckpt, save_path)
     
