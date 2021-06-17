@@ -15,7 +15,7 @@ python train/train.py \
     --num-mini-batch=4 \
     --log-interval=1 \
     --save-interval=32 \
-    --eval-interval=32 \
+    --eval-interval=1000 \
     --use-linear-lr-decay \
     --popart-reward \
     --entropy-coef=0.01 \
