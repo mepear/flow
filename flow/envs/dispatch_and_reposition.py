@@ -480,6 +480,8 @@ class DispatchAndRepositionEnv(Env):
         if self.__need_mid_edge:
             mid_edges = [self.edges[edge_id] for edge_id in rl_actions[2:]]
             if 'flow' not in mid_edges[0]:
+                if -1 in rl_actions[2:]:
+                    mid_edges = []
                 self.k.vehicle.pickup(self.__need_mid_edge, mid_edges)
                 res = self.k.vehicle.reservation[self.__need_mid_edge]
                 self.k.person.set_color(res.persons[0], (255, 255, 255)) # White

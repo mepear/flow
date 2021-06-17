@@ -77,27 +77,54 @@ class FixedMultiCategorical:
 
     def __init__(self, logits=None, action_dims=None):
         self.action_dims = action_dims
-        self.distributions = [torch.distributions.Categorical(logits=split) for split in torch.split(logits, tuple(self.action_dims), dim=1)]
+        self.distributions = []
+        for idx, split in enumerate(torch.split(logits, tuple(self.action_dims), dim=1)):
+            if not torch.isinf(split).all():
+                self.distributions.append(torch.distributions.Categorical(logits=split))
+            else:
+                assert idx > 1
+                self.distributions.append(None)
+                # self.distributions.append(torch.distributions.Categorical(logits=split))
+        self.device = self.distributions[0].probs.device
+
+        # self.distributions = [torch.distributions.Categorical(logits=split) for split in torch.split(logits, tuple(self.action_dims), dim=1)]
 
     def log_probs(self, actions):
-        return torch.stack(
-            [dist.log_prob(action) for dist, action in zip(self.distributions, torch.unbind(actions, dim=1))], dim=1
-        ).sum(dim=1).unsqueeze(-1)
+        try:
+            actions_mask = actions == -1
+            actions.masked_fill_(actions_mask, 0)
+            log_probs_all = torch.stack(
+                    [dist.log_prob(action) for dist, action in zip(self.distributions, torch.unbind(actions, dim=1)) if dist is not None], dim=1
+                )
+            if log_probs_all.size() == actions_mask.size() and actions_mask.sum() > 0:
+                log_probs_all.masked_fill_(actions_mask, 0)
+            return log_probs_all.sum(dim=1).unsqueeze(-1)
+        except Exception as e:
+            print(actions_mask)
+            print(e)
+        # try:
+        #     return torch.stack(
+        #         [dist.log_prob(action) for dist, action in zip(self.distributions, torch.unbind(actions, dim=1)) if dist is not None], dim=1
+        #     ).sum(dim=1).unsqueeze(-1)
+        # except Exception as e:
+        #     print(len(self.distributions), self.distributions)
+        #     print(actions.size(), actions)
+        #     print(e)
 
     def entropy(self):
         return torch.stack(
-            [dist.entropy() for dist in self.distributions], dim=1
+            [dist.entropy() for dist in self.distributions if dist is not None], dim=1
         ).sum(dim=1)
 
     def sample(self):
         return torch.stack(
-            [dist.sample() for dist in self.distributions], dim=1
+            [dist.sample() if dist is not None else torch.LongTensor([-1]).to(self.device) for dist in self.distributions], dim=1
         )
 
     def mode(self):
         # print('=' * 10, [torch.max(dist.probs, dim=1)[0] for dist in self.distributions])
         return torch.stack(
-            [torch.argmax(dist.probs, dim=1) for dist in self.distributions], dim=1
+            [torch.argmax(dist.probs, dim=1) if dist is not None else torch.LongTensor([-1]).to(self.device) for dist in self.distributions], dim=1
         )
 
 
