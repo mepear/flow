@@ -1,8 +1,11 @@
+from numpy.lib.type_check import _nan_to_num_dispatcher
+from flow.core.params import VehicleParams
 import numpy as np
 import torch
 import os
 import traci
 from functools import partial
+from tqdm import tqdm
 
 from .a2c_ppo_acktr import utils
 from .a2c_ppo_acktr.envs import make_vec_envs
@@ -32,6 +35,10 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     total_wait_times = []
     total_congestion_rates = []
     mean_velocities = []
+    background_velocities = [[] for _ in range(eval_envs.num_envs)]
+    background_co2s = [[] for _ in range(eval_envs.num_envs)]
+    taxi_velocities = [[] for _ in range(eval_envs.num_envs)]
+    taxi_co2s = [[] for _ in range(eval_envs.num_envs)]
     edge_position = None
     statistics = []
 
@@ -66,7 +73,11 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
         except KeyError:
             action_masks = None
 
-        for info in infos:
+        for i, info in enumerate(infos):
+            background_velocities[i].append(info['background_velocity'])
+            background_co2s[i].append(info['background_co2'])
+            taxi_velocities[i].append(info['taxi_velocity'])
+            taxi_co2s[i].append(info['taxi_co2'])
             if 'episode' in info.keys():
                 eval_episode_rewards.append(info['episode']['r'])
                 nums_orders.append(info['episode']['num_orders'])
@@ -76,8 +87,8 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 total_valid_distances.append(info['episode']['total_valid_distance'])
                 total_valid_times.append(info['episode']['total_valid_time'])
                 total_wait_times.append(info['episode']['total_wait_time'])
-                total_congestion_rates.append(info['episode']['total_congestion_rate'])
-                mean_velocities.append(info['episode']['mean_velocity'])
+                total_congestion_rates.append(np.mean(info['episode']['congestion_rates']))
+                mean_velocities.append(np.mean(info['episode']['mean_velocities'], axis=0))
                 edge_position = info['episode']['edge_position']
                 statistics.append(info['episode']['statistics'])
 
@@ -211,7 +222,8 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
             np.mean(total_congestion_rates), np.median(total_congestion_rates)))
     
     if do_plot_congestion:
-        plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
+        # plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
+        plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt)
 
 
 def get_corners(s, e, w):
@@ -298,5 +310,86 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     plt.savefig(os.path.join(save_path, 'distribution_{}.jpg'.format(ckpt)), dpi=500)
 
     plotter = partial(plot, statistics, edge_position)
-    draw(plotter, 3, cmap, ckpt, save_path)
+    draw(plotter, 1, cmap, ckpt, save_path)
+
+
+def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_co2s, save_path, ckpt):
+
+    background_velocities = background_velocities[:, 1:, :]
+    taxi_velocities = taxi_velocities[:, 1:, :]
+    background_co2s = background_co2s[:, :-1, :]
+    taxi_co2s = taxi_co2s[:, :-1, :]
     
+    def _plot_vel(ax, velocities, title):
+        num_env, num_step, num_vel = velocities.shape
+
+        mean_vel = velocities.transpose(0, 2, 1).reshape(-1, num_step).mean(axis=-1)
+        print(f'eval/velocity of {title} mean {mean_vel.mean()} median {np.median(mean_vel)}')
+        ax.hist(mean_vel)
+        ax.set_title('velocities of vehicles')
+        ax.set_xlabel('Velocity (m/s)')
+        ax.set_ylabel('Number')
+    
+    def _plot_co2(ax, co2s, title):
+
+        num_env, num_step, num_vel = co2s.shape
+
+        mean_co2 = co2s.transpose(0, 2, 1).reshape(-1, num_step).mean(axis=-1)
+        print(f'eval/co2 of {title} mean {mean_co2.mean()} median {np.median(mean_co2)}')
+        ax.set_title('co2 of vehicles')
+        ax.set_xlabel('Co2 (mg/s)')
+        ax.set_ylabel('Number')
+
+        ax.hist(mean_co2)
+    
+    def _plot(velocities, co2s, title):
+        fig, axs = plt.subplots(1, 2)
+        
+        _plot_vel(axs[0], velocities, title)
+        _plot_co2(axs[1], co2s, title)
+        fig.savefig(os.path.join(save_path, 'emission_{}_{}.jpg'.format(title, ckpt)), dpi=500, bbox_inches='tight')
+
+    _plot(background_velocities, background_co2s, 'background')
+    _plot(taxi_velocities, taxi_co2s, 'taxi')
+    _plot(np.concatenate([background_velocities, taxi_velocities], axis=-1), 
+    np.concatenate([background_co2s, taxi_co2s], axis=-1), 'all_vehicles')
+
+    fig, axs = plt.subplots(2, 1)
+    velocity = taxi_velocities[0, :, 0]
+    co2 = taxi_co2s[0, :, 0]
+    num_step = velocity.shape[0]
+
+    axs[0].scatter(range(num_step), velocity, s=1)
+    axs[0].set_ylabel('velocity')
+
+    axs2 = axs[0].twinx()
+    axs2.scatter(range(num_step), co2, s=1, c='r')
+    axs2.set_ylabel('co2')
+
+
+    axs[1].plot(range(num_step), velocity)
+    axs[1].set_ylabel('velocity')
+
+    axs3 = axs[1].twinx()
+    axs3.plot(range(num_step), co2, c='r')
+    axs3.set_ylabel('co2')
+
+    fig.savefig('vel_co2.jpg', dpi=500, bbox_inches='tight')
+
+
+    fig, axs = plt.subplots(2, 1, sharex=True)
+    velocity = np.concatenate([background_velocities, taxi_velocities], axis=-1).reshape(-1)
+    co2 = np.concatenate([background_co2s, taxi_co2s], axis=-1).reshape(-1)
+    sorted_index = np.argsort(velocity)
+
+    # mv_avg_vel = []
+    mv_avg_co2 = co2[sorted_index].reshape(-1, 100).mean(axis=1)
+    mv_avg_vel = velocity[sorted_index].reshape(-1, 100).mean(axis=1)
+
+    axs[0].plot(velocity[sorted_index], co2[sorted_index])
+    axs[1].plot(mv_avg_vel, mv_avg_co2)
+
+    axs[0].set_xlabel('velocity')
+    axs[1].set_xlabel('velocity')
+    axs[1].set_ylabel('co2')
+    fig.savefig('vel@co2.jpg')

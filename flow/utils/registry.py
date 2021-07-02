@@ -57,6 +57,9 @@ class Monitor(gym.Wrapper):
         self.info_keywords = info_keywords
         self.allow_early_resets = allow_early_resets
         self.rewards = None
+        self.mean_velocities = []
+        self.total_co2s = []
+        self.congestion_rates = []
         self.needs_reset = True
         self.episode_rewards = []
         self.episode_lengths = []
@@ -76,6 +79,9 @@ class Monitor(gym.Wrapper):
                 "wrap your env with Monitor(env, path, allow_early_resets=True)"
             )
         self.rewards = []
+        self.mean_velocities = []
+        self.total_co2s = []
+        self.congestion_rates = []
         self.needs_reset = False
         for key in self.reset_keywords:
             value = kwargs.get(key)
@@ -100,6 +106,9 @@ class Monitor(gym.Wrapper):
             raise RuntimeError("Tried to step environment that needs reset")
         observation, reward, done, info = self.env.step(action)
         self.rewards.append(reward)
+        self.mean_velocities.append(self.env.mean_velocity.copy())
+        self.total_co2s.append(self.env.total_co2.copy())
+        self.congestion_rates.append(self.env.congestion_rate)
         if done:
             self.needs_reset = True
             ep_rew = sum(self.rewards)
@@ -117,8 +126,9 @@ class Monitor(gym.Wrapper):
             ep_info['total_valid_distance'] = self.env.total_valid_distance
             ep_info['total_valid_time'] = self.env.total_valid_time
             ep_info['total_wait_time'] = self.env.total_wait_time
-            ep_info['total_congestion_rate'] = self.env.total_congestion_rate
-            ep_info['mean_velocity'] = self.env.mean_velocity
+            ep_info['congestion_rates'] = self.congestion_rates
+            ep_info['mean_velocities'] = self.mean_velocities
+            ep_info['total_co2s'] = self.total_co2s
             ep_info['edge_position'] = self.env.edge_position
             ep_info['statistics'] = self.env.statistics
             ep_info.update(self.current_reset_info)
@@ -128,6 +138,12 @@ class Monitor(gym.Wrapper):
             info["episode"] = ep_info
         info['action_mask'] = self.env.get_action_mask()
         info['reward'] = reward
+
+        info['background_velocity'] = self.env.background_velocity.copy()
+        info['background_co2'] = self.env.background_co2.copy()
+        info['taxi_velocity'] = self.env.taxi_velocity.copy()
+        info['taxi_co2'] = self.env.taxi_co2.copy()
+
         self.total_steps += 1
         return observation, reward, done, info
 

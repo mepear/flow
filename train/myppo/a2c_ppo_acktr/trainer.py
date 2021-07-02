@@ -232,6 +232,7 @@ class Trainer:
             self.save_path, self.writer, total_num_steps)
 
     def run(self):
+        print(self.n_env_steps // self.n_step_per_ep // (self.n_env_per_split * self.n_actor))
         self.setup_actors()
 
         self.start_time = time.time()

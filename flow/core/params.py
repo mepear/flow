@@ -303,6 +303,7 @@ class VehicleParams:
         type_params.update(car_following_params.controller_params)
         type_params.update(lane_change_params.controller_params)
         type_params['vClass'] = 'taxi' if is_taxi else 'passenger'
+        type_params['emissionClass'] = 'HBEFA3/PC'
 
         # This dict will be used when trying to introduce new vehicles into
         # the network via a Flow. It is passed to the vehicle kernel object

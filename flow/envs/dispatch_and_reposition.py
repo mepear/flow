@@ -31,6 +31,7 @@ ADDITIONAL_ENV_PARAMS = {
     "starting_distance": 100,
     "time_price": 0.00, # in second
     "distance_price": 0.0, # in meter
+    "co2_penalty": 0.0, # in g
     "miss_penalty": 0, # miss a reservation
     "wait_penalty": 0.0, # in second
     "tle_penalty": 0.00, # in second
@@ -64,6 +65,7 @@ class DispatchAndRepositionEnv(Env):
         self.pickup_price = env_params.additional_params['pickup_price']
         self.time_price = env_params.additional_params['time_price']
         self.distance_price = env_params.additional_params['distance_price']
+        self.co2_penalty = env_params.additional_params['co2_penalty']
         self.miss_penalty = env_params.additional_params['miss_penalty']
         self.wait_penalty = env_params.additional_params['wait_penalty']
         self.tle_penalty = env_params.additional_params['tle_penalty']
@@ -93,7 +95,7 @@ class DispatchAndRepositionEnv(Env):
         self.total_pickup_distance = 0
         self.total_pickup_time = 0
         self.total_wait_time = 0
-        self.total_congestion_rate = 0
+        self.congestion_rate = 0
 
         self.stop_distance_eps = env_params.additional_params['stop_distance_eps']
         
@@ -114,10 +116,16 @@ class DispatchAndRepositionEnv(Env):
 
         self.num_taxi = network.vehicles.num_rl_vehicles
         self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi) == 'taxi']
+        self.background_cars = [car for car in network.vehicles.ids if network.vehicles.get_type(car) != 'taxi']
         assert self.num_taxi == len(self.taxis)
         self.num_vehicles = network.vehicles.num_vehicles
 
         self.mean_velocity = np.zeros(len(self.edges))
+        self.total_co2 = np.zeros(len(self.edges))
+        self.background_velocity = np.zeros(len(self.background_cars))
+        self.background_co2 = np.zeros(len(self.background_cars))
+        self.taxi_velocity = np.zeros(len(self.taxis))
+        self.taxi_co2 = np.zeros(len(self.taxis))
         self.edge_position = [(self.k.kernel_api.simulation.convert2D(edge, 0), \
             self.k.kernel_api.simulation.convert2D(edge, self.k.kernel_api.lane.getLength(edge + '_0')), \
             self.k.kernel_api.lane.getWidth(edge + '_0')) \
@@ -260,7 +268,10 @@ class DispatchAndRepositionEnv(Env):
     @property
     def action_space(self):
         """See class definition."""
-        return MultiDiscrete([len(self.edges), self.num_taxi + 1] + [len(self.edges)] * self.n_mid_edge)
+        try:
+            return MultiDiscrete([len(self.edges), self.num_taxi + 1] + [len(self.edges)] * self.n_mid_edge, dtype=np.float32)
+        except:
+            return MultiDiscrete([len(self.edges), self.num_taxi + 1] + [len(self.edges)] * self.n_mid_edge)
         # return MultiDiscrete([self.num_taxi + 1, len(self.edges)])
 
     @property
@@ -397,8 +408,13 @@ class DispatchAndRepositionEnv(Env):
         self.total_pickup_distance = 0
         self.total_pickup_time = 0
         self.total_wait_time = 0
-        self.total_congestion_rate = 0
+        self.congestion_rate = 0
         self.mean_velocity = np.zeros(len(self.edges))
+        self.total_co2 = np.zeros(len(self.edges))
+        self.background_velocity = np.zeros(len(self.background_cars))
+        self.background_co2 = np.zeros(len(self.background_cars))
+        self.taxi_velocity = np.zeros(len(self.taxis))
+        self.taxi_co2 = np.zeros(len(self.taxis))
         self.stop_time = [None] * len(self.taxis)
         self.statistics = {
             'route': {},
@@ -508,16 +524,30 @@ class DispatchAndRepositionEnv(Env):
         timestep = self.sim_params.sim_step * self.env_params.sims_per_step
         n_edge = len(self.edges)
 
-        # collect the mean velocity of edges
+        # collect the mean velocity and total emission of edges
         num_congestion = 0.0
         for i, edge in enumerate(self.edges):
             n_veh = self.k.kernel_api.edge.getLastStepVehicleNumber(edge)
-            mean_vel = self.k.kernel_api.edge.getLastStepMeanSpeed(edge) if n_veh > 0 else 10.0 # MAX_SPEED = 10.0
-            self.mean_velocity[i] += mean_vel / 10.0 / self.env_params.horizon
-            if n_veh > 0:
-                if mean_vel < 3.0: # a threshold for congestion
-                    num_congestion += 1        
-        self.total_congestion_rate += num_congestion / len(self.edges)
+            mean_vel = self.k.kernel_api.edge.getLastStepMeanSpeed(edge) # if n_veh > 0 else 10.0 # MAX_SPEED = 10.0
+            co2 = self.k.kernel_api.edge.getCO2Emission(edge)
+            self.mean_velocity[i] = mean_vel #/ 10.0 / self.env_params.horizon
+            self.total_co2[i] = co2
+            if n_veh > 0 and mean_vel < 3.0: # a threshold for congestion
+                num_congestion += 1
+        self.congestion_rate = num_congestion / len(self.edges)
+
+        #  collect the velocities and co2 emissions of vehicles
+        for i, vehicle in enumerate(self.background_cars):
+            speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
+            co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+            self.background_velocity[i] = speed
+            self.background_co2[i] = co2
+        
+        for i, vehicle in enumerate(self.taxis):
+            speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
+            co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+            self.taxi_velocity[i] = speed
+            self.taxi_co2[i] = co2
 
         # collect the free vehicle density
         if 'free' not in self.statistics['route']:
@@ -635,8 +665,11 @@ class DispatchAndRepositionEnv(Env):
                 self.taxi_states[taxi]['empty'] = True
                 self.taxi_states[taxi]['pickup_distance'] = None
                 self.num_complete_orders += 1
-        normalizing_term = len(self.taxis) * \
-            (self.pickup_price + timestep * self.time_price + 55.55 * timestep * self.distance_price) # default maxSpeed = 55.55 m/s
+        # co2 penalty
+        reward -= self.total_co2.sum() * 1e-3 * self.co2_penalty
+
+        # normalizing_term = len(self.taxis) * \
+            # (self.pickup_price + timestep * self.time_price + 55.55 * timestep * self.distance_price) # default maxSpeed = 55.55 m/s
         # reward -= normalizing_term * 0.5
         # reward = reward / self.env_params.horizon
         return reward

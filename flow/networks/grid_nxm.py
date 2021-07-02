@@ -16,6 +16,8 @@ ADDITIONAL_NET_PARAMS = {
         # length of inner edges in the traffic light grid network
         "inner_length": None,
         # split a edge to several sub-edges, the number of sub-edges
+        "outer_length": None,
+        # length of outer edges in the traffic light grid network
         "sub_edge_num": 1,
     },
     # number of lanes in the horizontal edges
@@ -88,13 +90,13 @@ class GridnxmNetwork(Network):
                  initial_config=InitialConfig(),
                  traffic_lights=TrafficLightParams()):
         """Initialize an n*m traffic light grid network."""
-        optional = ["tl_logic"]
+        optional = ["tl_logic", "outer_length"]
         for p in ADDITIONAL_NET_PARAMS.keys():
             if p not in net_params.additional_params and p not in optional:
                 raise KeyError('Network parameter "{}" not supplied'.format(p))
 
         for p in ADDITIONAL_NET_PARAMS["grid_array"].keys():
-            if p not in net_params.additional_params["grid_array"]:
+            if p not in net_params.additional_params["grid_array"] and p not in optional:
                 raise KeyError(
                     'Grid array parameter "{}" not supplied'.format(p))
 
@@ -114,6 +116,7 @@ class GridnxmNetwork(Network):
         self.row_num = self.grid_array["row_num"]
         self.col_num = self.grid_array["col_num"]
         self.inner_length = self.grid_array["inner_length"]
+        self.outer_length = self.grid_array.get("outer_length", None)
         self.sub_edge_num = self.grid_array["sub_edge_num"]
 
         # specifies whether or not there will be traffic lights at the
@@ -322,10 +325,6 @@ class GridnxmNetwork(Network):
 
     def specify_connections(self, net_params):
         """Build out connections at each inner node.
-
-        Connections describe what happens at the intersections. Here we link
-        lanes in straight lines, which means vehicles cannot turn at
-        intersections, they can only continue in a straight line.
         """
         con_dict = {}
 
@@ -649,4 +648,330 @@ class GridnxmNetworkInflow(GridnxmNetwork):
                     "fromLane": str(0),
                     "toLane": str(0),                        
                     })
+        return con_dict
+
+class GridnxmNetworkExpand(GridnxmNetwork):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.outer_length = self.grid_array['outer_length']
+
+    @property
+    def _outer_nodes(self):
+        """Build out the outer nodes of the network.
+
+        The outer nodes correspond to the extremities of the roads. There are
+        two at each extremity, one where the vehicles enter the network
+        (inflow) and one where the vehicles exit the network (outflow).
+
+        Consider the following network with 2 rows and 3 columns, where the
+        extremities are marked by 'x', the rows are labeled from 0 to 1 and the
+        columns are labeled from 0 to 2:
+
+                 x     x     x
+                 |     |     |
+        (1) x----|-----|-----|----x (*)
+                 |     |     |
+        (0) x----|-----|-----|----x
+                 |     |     |
+                 x     x     x
+                (0)   (1)   (2)
+
+        On row i, there are two nodes at the left extremity of the row, labeled
+        "left_row_in{i}" and "left_row_out{i}", as well as two nodes at the
+        right extremity labeled "right_row_in{i}" and "right_row_out{i}".
+
+        On column j, there are two nodes at the bottom extremity of the column,
+        labeled "bot_col_in{j}" and "bot_col_out{j}", as well as two nodes
+        at the top extremity labeled "top_col_in{j}" and "top_col_out{j}".
+
+        The "in" nodes correspond to where vehicles enter the network while
+        the "out" nodes correspond to where vehicles exit the network.
+
+        For example, at extremity (*) on row (1):
+        - the id of the input node is "right_row_in1"
+        - the id of the output node is "right_row_out1"
+
+        Returns
+        -------
+        list <dict>
+            List of outer nodes
+        """
+        nodes = []
+
+        def new_node(x, y, name, i):
+            return [{"id": name + str(i), "x": x, "y": y, "type": "priority"}]
+
+        # build nodes at the extremities of columns
+        for col in range(self.col_num):
+            x = col * self.inner_length
+            y = (self.row_num - 1) * self.inner_length
+            nodes += new_node(x, - self.outer_length, "bot_col_in", col)
+            nodes += new_node(x, - self.outer_length, "bot_col_out", col)
+            nodes += new_node(x, y + self.outer_length, "top_col_in", col)
+            nodes += new_node(x, y + self.outer_length, "top_col_out", col)
+
+        # build nodes at the extremities of rows
+        for row in range(self.row_num):
+            x = (self.col_num - 1) * self.inner_length
+            y = row * self.inner_length
+            nodes += new_node(- self.outer_length, y, "left_row_in", row)
+            nodes += new_node(- self.outer_length, y, "left_row_out", row)
+            nodes += new_node(x + self.outer_length, y, "right_row_in", row)
+            nodes += new_node(x + self.outer_length, y, "right_row_out", row)
+
+        return nodes
+
+    @property
+    def _outer_edges(self):
+        """Build out the outer edges of the network.
+
+        The outer edges are the edges joining the inner nodes to the outer
+        nodes.
+
+        Consider the following network with n = 2 rows and m = 3 columns,
+        where the rows are indexed from 0 to 1 and the columns from 0 to 2, the
+        inner nodes are marked by 'x' and the outer nodes by 'o':
+
+                o    o    o
+                |    |    |
+        (1) o---x----x----x-(*)-o
+                |    |    |
+        (0) o---x----x----x-----o
+                |    |    |
+                o    o    o
+               (0)  (1)  (2)
+
+        There are n * 2 = 4 horizontal outer edges and m * 2 = 6 vertical outer
+        edges, all that multiplied by two because each edge consists of two
+        roads going in opposite directions traffic-wise.
+
+        On row i, there are four horizontal edges: the left ones labeled
+        "in_bot{i}_0" (in) and "out_top{i}_0" (out) and the right ones labeled
+        "out_bot{i}_{m}" (out) and "in_top{i}_{m}" (in).
+
+        On column j, there are four vertical edges: the bottom ones labeled
+        "out_left0_{j}" (out) and "in_right0_{j}" (in) and the top ones labeled
+        "in_left{n}_{j}" (in) and "out_right{n}_{j}" (out).
+
+        For example, on edge (*) on row (1): the id of the bottom road (out)
+        is "out_bot1_3" and the id of the top road is "in_top1_3".
+
+        Edges labeled by "in" are edges where vehicles enter the network while
+        edges labeled by "out" are edges where vehicles exit the network.
+
+        Returns
+        -------
+        list <dict>
+            List of outer edges
+        """
+        edges = []
+
+        def new_edge(index, from_node, to_node, orientation, length):
+            return [{
+                "id": index,
+                "type": {"v": "vertical", "h": "horizontal"}[orientation],
+                "priority": 78,
+                "from": from_node,
+                "to": to_node,
+                "length": length
+            }]
+
+        for i in range(self.col_num):
+            # bottom edges
+            id1 = "in_right0_{}".format(i)
+            id2 = "out_left0_{}".format(i)
+            node1 = "bot_col_in{}".format(i)
+            node2 = "center{}".format(i)
+            node3 = "bot_col_out{}".format(i)
+            edges += new_edge(id1, node1, node2, "v", self.outer_length)
+            edges += new_edge(id2, node2, node3, "v", self.outer_length)
+
+            # top edges
+            id1 = "in_left{}_{}".format(self.row_num, i)
+            id2 = "out_right{}_{}".format(self.row_num, i)
+            node1 = "top_col_in{}".format(i)
+            node2 = "center{}".format((self.row_num - 1) * self.col_num + i)
+            node3 = "top_col_out{}".format(i)
+            edges += new_edge(id1, node1, node2, "v", self.outer_length)
+            edges += new_edge(id2, node2, node3, "v", self.outer_length)
+
+        for j in range(self.row_num):
+            # left edges
+            id1 = "in_bot{}_0".format(j)
+            id2 = "out_top{}_0".format(j)
+            node1 = "left_row_in{}".format(j)
+            node2 = "center{}".format(j * self.col_num)
+            node3 = "left_row_out{}".format(j)
+            edges += new_edge(id1, node1, node2, "h", self.outer_length)
+            edges += new_edge(id2, node2, node3, "h", self.outer_length)
+
+            # right edges
+            id1 = "in_top{}_{}".format(j, self.col_num)
+            id2 = "out_bot{}_{}".format(j, self.col_num)
+            node1 = "right_row_in{}".format(j)
+            node2 = "center{}".format((j + 1) * self.col_num - 1)
+            node3 = "right_row_out{}".format(j)
+            edges += new_edge(id1, node1, node2, "h", self.outer_length)
+            edges += new_edge(id2, node2, node3, "h", self.outer_length)
+
+        return edges
+
+    def specify_nodes(self, net_params):
+        inner_nodes = super().specify_nodes(net_params)
+        return inner_nodes + self._outer_nodes
+    
+    def specify_edges(self, net_params):
+        inner_edges = super().specify_edges(net_params)
+        return inner_edges + self._outer_edges
+
+    def specify_connections(self, net_params):
+        """Build out connections at each inner node.
+        """
+        con_dict = super().specify_connections(net_params)
+        
+        def new_con(side, from_id, to_id, toside, from_sub_id=None, to_sub_id=None):
+            assert "out" not in side
+            assert "in" not in toside
+            lane1s = range(self.vertical_lanes)
+            lane2s = range(self.vertical_lanes)
+
+            conn = []
+            lane1s = range(self.vertical_lanes)
+            for lane1 in lane1s:
+                for lane2 in lane2s:
+                    conn.append({
+                    "from": side + from_id + "_{}".format(from_sub_id) if from_sub_id is not None else side + from_id,
+                    "to": toside + to_id + "_{}".format(to_sub_id) if to_sub_id is not None else toside + to_id,
+                    "fromLane": str(lane1),
+                    "toLane": str(lane2),                        
+                    })
+            return conn
+                
+
+        # build connections at each inner node
+        # node_ids = [edge['id'][-3:] for edge in self.edges]
+        for node_id in range(self.row_num * self.col_num):
+            conn = []
+            i = node_id // self.col_num
+            j = node_id % self.col_num
+            top_edge_id = "{}_{}".format(i+1, j) # if i + 1 < self.row_num else None
+            bot_edge_id = "{}_{}".format(i, j) # if i > 0 else None
+            left_edge_id = "{}_{}".format(i, j) # if j > 0 else None
+            right_edge_id = "{}_{}".format(i, j+1) # if j + 1 < self.col_num else None
+            assert self.vertical_lanes == self.horizontal_lanes
+            # bottom left
+            if i  == 0 and j == 0:
+
+                conn += new_con("in_right", bot_edge_id, top_edge_id, "right", to_sub_id=0)
+                conn += new_con("left", top_edge_id, bot_edge_id, "out_left", from_sub_id=0)
+
+                conn += new_con("in_bot", left_edge_id, right_edge_id, "bot", to_sub_id=0)
+                conn += new_con("top", right_edge_id, left_edge_id, "out_top", from_sub_id=0)
+
+                conn += new_con('in_bot', left_edge_id, top_edge_id, "right", to_sub_id=0)
+                conn += new_con('left', top_edge_id, left_edge_id, 'out_top', from_sub_id=0)
+
+                conn += new_con("in_right", bot_edge_id, right_edge_id, "bot", to_sub_id=0)
+                conn += new_con("top", right_edge_id, bot_edge_id, "out_left", from_sub_id=0)
+
+                conn += new_con("in_bot", left_edge_id, bot_edge_id, "out_left")
+                conn += new_con("in_right", bot_edge_id, left_edge_id, "out_top")
+            
+            # bottom right
+            elif i  == 0 and j + 1 == self.col_num:
+
+                conn += new_con("in_right", bot_edge_id, top_edge_id, "right", to_sub_id=0)
+                conn += new_con("left", top_edge_id, bot_edge_id, "out_left", from_sub_id=0)
+
+                conn += new_con("bot", left_edge_id, right_edge_id, "out_bot", from_sub_id=0)
+                conn += new_con("in_top", right_edge_id, left_edge_id, "top", to_sub_id=0)
+
+                conn += new_con('in_top', right_edge_id, top_edge_id, "right", to_sub_id=0)
+                conn += new_con('left', top_edge_id, right_edge_id, 'out_bot', from_sub_id=0)
+
+                conn += new_con("bot", left_edge_id, bot_edge_id, "out_left", from_sub_id=self.sub_edge_num-1)
+                conn += new_con("in_right", bot_edge_id, left_edge_id, "top", to_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("in_right", bot_edge_id, right_edge_id, "out_bot")
+                conn += new_con("in_top", right_edge_id, bot_edge_id, "out_left")
+            
+            # top left
+            elif i + 1 == self.row_num and j == 0:
+                conn += new_con("right", bot_edge_id, top_edge_id, "out_right", from_sub_id=self.sub_edge_num-1)
+                conn += new_con("in_left", top_edge_id, bot_edge_id, "left", to_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("in_bot", left_edge_id, right_edge_id, "bot", to_sub_id=0)
+                conn += new_con("top", right_edge_id, left_edge_id, "out_top", from_sub_id=0)
+
+                conn += new_con("in_left", top_edge_id, right_edge_id, "bot", to_sub_id=0)
+                conn += new_con("top", right_edge_id, top_edge_id, "out_right", from_sub_id=0)
+
+                conn += new_con("in_bot", left_edge_id, bot_edge_id, "left", to_sub_id=self.sub_edge_num-1)
+                conn += new_con("right", bot_edge_id, left_edge_id, "out_top", from_sub_id=self.sub_edge_num-1)
+
+                conn += new_con('in_bot', left_edge_id, top_edge_id, "out_right")
+                conn += new_con('in_left', top_edge_id, left_edge_id, "out_top")
+
+            # top right
+            elif i + 1 == self.row_num and j + 1 == self.col_num:
+                conn += new_con("right", bot_edge_id, top_edge_id, "out_right", from_sub_id=self.sub_edge_num-1)
+                conn += new_con("in_left", top_edge_id, bot_edge_id, "left", to_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("bot", left_edge_id, right_edge_id, "out_bot", from_sub_id=self.sub_edge_num-1)
+                conn += new_con("in_top", right_edge_id, left_edge_id, "top", to_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("in_top", right_edge_id, bot_edge_id, "left", to_sub_id=self.sub_edge_num-1)
+                conn += new_con("right", bot_edge_id, right_edge_id, "out_bot", from_sub_id=self.sub_edge_num-1)
+
+                conn += new_con('bot', left_edge_id, top_edge_id, "out_right", from_sub_id=self.sub_edge_num-1)
+                conn += new_con('in_left', top_edge_id, left_edge_id, "top", to_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("in_left", top_edge_id, right_edge_id, "out_bot")
+                conn += new_con("in_top", right_edge_id, top_edge_id, "out_right")
+
+            # bot
+            elif i == 0:
+                conn += new_con("in_right", bot_edge_id, top_edge_id, "right", to_sub_id=0)
+                conn += new_con("left", top_edge_id, bot_edge_id, "out_left", from_sub_id=0)
+
+                conn += new_con("in_right", bot_edge_id, right_edge_id, "bot", to_sub_id=0)
+                conn += new_con("top", right_edge_id, bot_edge_id, "out_left", from_sub_id=0)
+
+                conn += new_con("bot", left_edge_id, bot_edge_id, "out_left", from_sub_id=self.sub_edge_num-1)
+                conn += new_con("in_right", bot_edge_id, left_edge_id, "top", to_sub_id=self.sub_edge_num-1)
+            # left
+            elif j == 0:
+                conn += new_con("in_bot", left_edge_id, right_edge_id, "bot", to_sub_id=0)
+                conn += new_con("top", right_edge_id, left_edge_id, "out_top", from_sub_id=0)
+
+                conn += new_con('in_bot', left_edge_id, top_edge_id, "right", to_sub_id=0)
+                conn += new_con('left', top_edge_id, left_edge_id, 'out_top', from_sub_id=0)
+
+                conn += new_con("in_bot", left_edge_id, bot_edge_id, "left", to_sub_id=self.sub_edge_num-1)
+                conn += new_con("right", bot_edge_id, left_edge_id, "out_top", from_sub_id=self.sub_edge_num-1)
+            # top
+            elif i + 1 == self.row_num:
+                conn += new_con("right", bot_edge_id, top_edge_id, "out_right", from_sub_id=self.sub_edge_num-1)
+                conn += new_con("in_left", top_edge_id, bot_edge_id, "left", to_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("in_left", top_edge_id, right_edge_id, "bot", to_sub_id=0)
+                conn += new_con("top", right_edge_id, top_edge_id, "out_right", from_sub_id=0)
+
+                conn += new_con('bot', left_edge_id, top_edge_id, "out_right", from_sub_id=self.sub_edge_num-1)
+                conn += new_con('in_left', top_edge_id, left_edge_id, "top", to_sub_id=self.sub_edge_num-1)
+            # right
+            elif j + 1 == self.col_num:
+                conn += new_con("bot", left_edge_id, right_edge_id, "out_bot", from_sub_id=self.sub_edge_num-1)
+                conn += new_con("in_top", right_edge_id, left_edge_id, "top", to_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("in_top", right_edge_id, bot_edge_id, "left", to_sub_id=self.sub_edge_num-1)
+                conn += new_con("right", bot_edge_id, right_edge_id, "out_bot", from_sub_id=self.sub_edge_num-1)
+
+                conn += new_con("left", top_edge_id, right_edge_id, "out_bot", from_sub_id=0)
+                conn += new_con("in_top", right_edge_id, top_edge_id, "right", to_sub_id=0)
+            
+            node_id = "center{}".format(node_id)
+            con_dict[node_id] += conn
+
         return con_dict
