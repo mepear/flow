@@ -223,7 +223,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     
     if do_plot_congestion:
         # plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
-        plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt)
+        plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, num_processes=num_processes)
 
 
 def get_corners(s, e, w):
@@ -313,7 +313,7 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     draw(plotter, 1, cmap, ckpt, save_path)
 
 
-def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_co2s, save_path, ckpt):
+def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_co2s, save_path, ckpt, num_processes=100):
 
     background_velocities = background_velocities[:, 1:, :]
     taxi_velocities = taxi_velocities[:, 1:, :]
@@ -383,8 +383,8 @@ def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_
     sorted_index = np.argsort(velocity)
 
     # mv_avg_vel = []
-    mv_avg_co2 = co2[sorted_index].reshape(-1, 100).mean(axis=1)
-    mv_avg_vel = velocity[sorted_index].reshape(-1, 100).mean(axis=1)
+    mv_avg_co2 = co2[sorted_index].reshape(-1, num_processes).mean(axis=1)
+    mv_avg_vel = velocity[sorted_index].reshape(-1, num_processes).mean(axis=1)
 
     axs[0].plot(velocity[sorted_index], co2[sorted_index])
     axs[1].plot(mv_avg_vel, mv_avg_co2)
