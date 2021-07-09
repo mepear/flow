@@ -48,7 +48,7 @@ def get_non_flow_params(enter_speed, inflows, add_net_params):
     """
     additional_init_params = {'enter_speed': enter_speed}
     initial = InitialConfig(
-        x0=2.5, spacing='uniform', min_gap=10, additional_params=additional_init_params) # gap needs to be large enough
+        x0=2.5, spacing='uniform', min_gap=10, edges_distribution='inner', additional_params=additional_init_params) # gap needs to be large enough
     net = NetParams(inflows=inflows, additional_params=add_net_params)
 
     return initial, net
@@ -85,7 +85,7 @@ vehicles.add(
     lane_change_params=SumoLaneChangeParams(
         lane_change_mode="sumo_default",
     ),
-    num_vehicles=20,
+    num_vehicles=1,
     is_taxi=False)
 
 tl_logic = TrafficLightParams(baseline=False)

@@ -20,7 +20,7 @@ from gym.spaces import Tuple
 from flow.core import rewards
 from flow.envs.base import Env
 from flow.utils.distributions import gen_request
-from traci.exceptions import TraCIException
+from traci.exceptions import TraCIException, FatalTraCIError
 
 import threading
 from exclusiveprocess import Lock, CannotAcquireLock
@@ -61,6 +61,7 @@ class DispatchAndRepositionEnv(Env):
         self.rows = self.grid_array["row_num"]
         self.cols = self.grid_array["col_num"]
         self.inner_length = self.grid_array['inner_length']
+        self.outer_length = self.grid_array.get("outer_length", None)
 
         self.pickup_price = env_params.additional_params['pickup_price']
         self.time_price = env_params.additional_params['time_price']
@@ -112,10 +113,23 @@ class DispatchAndRepositionEnv(Env):
         }
 
         self.edges = self.k.network.get_edge_list()
+        # in/out flow edge cannot be visited by taxi
+        self.flow_edges = []
+        self.in_edges = []
+        self.out_edges = []
+        for i, edge in enumerate(self.edges):
+            if 'flow' in edge:
+                self.flow_edges.append(i)
+            elif 'in' in edge:
+                self.in_edges.append(i)
+            elif 'out' in edge:
+                self.out_edges.append(i)
+
         self._preprocess()
 
         self.num_taxi = network.vehicles.num_rl_vehicles
         self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi) == 'taxi']
+        self.outside_taxis = []
         self.background_cars = [car for car in network.vehicles.ids if network.vehicles.get_type(car) != 'taxi']
         assert self.num_taxi == len(self.taxis)
         self.num_vehicles = network.vehicles.num_vehicles
@@ -319,7 +333,9 @@ class DispatchAndRepositionEnv(Env):
                 raise KeyError
             x, y = self.k.vehicle.get_2d_position(taxi, error=(-1, -1))
             from_x, from_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[0], 0)
-            to_x, to_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[-1], self.inner_length - 2)
+            to_edge = self.k.kernel_api.vehicle.getRoute(taxi)[-1]
+            to_pos = self.inner_length - 2 if 'out' not in to_edge else self.outer_length - 2
+            to_x, to_y = self.k.kernel_api.simulation.convert2D(to_edge, to_pos)
             # cur_taxi_feature = [0, x, y, self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[0]), self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[-1])]
             cur_taxi_feature = [0, 0, 0, x, y, from_x, from_y, to_x, to_y] # use (x, y) or edge id
             cur_taxi_feature[0 if taxi in empty_taxi else 1 if taxi in pickup_taxi else 2] = 1
@@ -374,7 +390,12 @@ class DispatchAndRepositionEnv(Env):
         empty_taxi_fleet = self.k.vehicle.get_taxi_fleet(0)
         self.__need_reposition = None
         for taxi in empty_taxi_fleet:
-            if self.k.kernel_api.vehicle.isStopped(taxi):
+            edge = self.k.vehicle.get_edge(taxi)
+            edge_id = self.edges.index(edge) if edge in self.edges else -1
+            # Don't reposit the taxi in flow_edges, in_edges and out_edges
+            if edge_id in self.flow_edges + self.out_edges:
+                continue
+            elif self.k.kernel_api.vehicle.isStopped(taxi):
                 self.__need_reposition = taxi
                 break
         
@@ -416,6 +437,7 @@ class DispatchAndRepositionEnv(Env):
         self.taxi_velocity = np.zeros(len(self.taxis))
         self.taxi_co2 = np.zeros(len(self.taxis))
         self.stop_time = [None] * len(self.taxis)
+        self.outside_taxis = []
         self.statistics = {
             'route': {},
             'location': {}
@@ -538,14 +560,22 @@ class DispatchAndRepositionEnv(Env):
 
         #  collect the velocities and co2 emissions of vehicles
         for i, vehicle in enumerate(self.background_cars):
-            speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
-            co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+            try:
+                speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
+                co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+            except TraCIException:
+                speed = 0
+                co2 = 0
             self.background_velocity[i] = speed
             self.background_co2[i] = co2
         
         for i, vehicle in enumerate(self.taxis):
-            speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
-            co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+            try:
+                speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
+                co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+            except TraCIException:
+                speed = 0
+                co2 = 0
             self.taxi_velocity[i] = speed
             self.taxi_co2[i] = co2
 
@@ -681,6 +711,8 @@ class DispatchAndRepositionEnv(Env):
         self._add_request()
         # self._remove_tle_request()
         self._check_arrived()
+        self._check_outside()
+
 
     def _check_route_valid(self):
         for veh_id in self.taxis:
@@ -689,6 +721,85 @@ class DispatchAndRepositionEnv(Env):
                 # if the route is not valid, we need to reset the route
                 self.k.kernel_api.vehicle.rerouteTraveltime(veh_id)
     
+    def _check_outside(self):
+        candidate_edges = self.in_edges.copy()
+        for i, veh_id in enumerate(self.background_cars):
+            edge = self.k.vehicle.get_edge(veh_id)
+            edge_idx = self.edges.index(edge) if edge in self.edges else -1
+            if edge_idx in self.out_edges:
+                in_edge_idx = np.random.choice(candidate_edges)
+                candidate_edges.remove(in_edge_idx)
+                in_edge = self.edges[in_edge_idx]
+                x, y = self.edge_position[in_edge_idx][0]
+                self.k.kernel_api.vehicle.moveToXY(veh_id, in_edge, lane='0', x=x, y=y, keepRoute=0)
+
+        for i, taxi in enumerate(self.taxis):
+            edge = self.k.vehicle.get_edge(taxi)
+            edge_idx = self.edges.index(edge) if edge in self.edges else -1
+            if taxi in self.outside_taxis:
+                in_edge_idx = np.random.choice(candidate_edges)
+                in_edge = self.edges[in_edge_idx]
+                # in_edge = self.k.vehicle.get_route(taxi)[0]
+                # in_edge_idx = self.edges.index(in_edge)
+                x, y = self.edge_position[in_edge_idx][0]
+
+                # self.k.vehicle.remove(taxi)
+                try:
+                    # self.k.vehicle.add(
+                    #     taxi,
+                    #     'taxi',
+                    #     edge=in_edge,
+                    #     pos=0,
+                    #     lane=0,
+                    #     speed=0,
+                    # )
+
+                    # self.k.kernel_api.vehicle.setSpeed(taxi, -1)
+                    self.k.kernel_api.vehicle.moveToXY(taxi, in_edge, lane='0', x=x, y=y, keepRoute=0)
+                    self.outside_taxis.remove(taxi)
+                    pass
+                except TraCIException:
+                    self.k.vehicle.remove(taxi)
+                    self.k.kernel_api.vehicle.remove(taxi)
+                    self.k.vehicle.add(
+                        taxi,
+                        'taxi',
+                        edge=in_edge,
+                        pos=0,
+                        lane=0,
+                        speed=0,
+                    )
+
+        #     elif edge_idx in self.out_edges and taxi in self.k.vehicle.get_taxi_fleet(0) and self.k.kernel_api.vehicle.isStopped(taxi):
+        #         in_edge_idx = np.random.choice(candidate_edges)
+        #         in_edge = self.edges[in_edge_idx]
+        #         self.k.kernel_api.vehicle.resume(taxi)
+        #         self.k.kernel_api.vehicle.setRoute(taxi, [edge])
+        #         # self.k.kernel_api.vehicle.changeTarget(taxi, edge)
+        #         # try:
+        #         #     self.k.vehicle.remove(taxi)
+        #         #     self.k.vehicle.add(
+        #         #         taxi,
+        #         #         'taxi',
+        #         #         edge=in_edge,
+        #         #         pos=0,
+        #         #         lane=0,
+        #         #         speed=0,
+        #         #     )
+        #         # except TraCIException:
+        #         #     self.k.vehicle.remove(taxi)
+        #         #     self.k.kernel_api.vehicle.remove(taxi)
+        #         #     self.k.vehicle.add(
+        #         #         taxi,
+        #         #         'taxi',
+        #         #         edge=in_edge,
+        #         #         pos=0,
+        #         #         lane=0,
+        #         #         speed=0,
+        #         #     )
+        #         self.k.kernel_api.vehicle.setSpeed(taxi, 0)
+        #         self.outside_taxis.append(taxi)
+   
     def _check_arrived(self):
         
         def is_arrived(veh_id, edge, pos):
@@ -699,7 +810,7 @@ class DispatchAndRepositionEnv(Env):
                     return True
             return False
 
-        for i,  taxi in enumerate(self.taxis):
+        for i, taxi in enumerate(self.taxis):
             if self.k.vehicle.is_pickup(taxi):
                 tgt_edge, tgt_pos = self.k.vehicle.pickup_stop[taxi]
             elif self.k.vehicle.is_occupied(taxi):
@@ -709,7 +820,7 @@ class DispatchAndRepositionEnv(Env):
                     continue
                 tgt_edge, tgt_pos = self.k.vehicle.dropoff_stop[taxi]
             elif self.k.vehicle.is_free(taxi):
-                if len(self.k.kernel_api.vehicle.getStops(taxi)) == 0:
+                if len(self.k.kernel_api.vehicle.getStops(taxi)) == 0 and taxi not in self.outside_taxis:
                     self.k.vehicle.stop(taxi)
                 continue
             else:
@@ -729,7 +840,22 @@ class DispatchAndRepositionEnv(Env):
                     assert self.stop_time[i] is None or self.stop_time[i] <= 3 * self.env_params.sims_per_step
                     if self.stop_time[i] == 3 * self.env_params.sims_per_step:
                         self.stop_time[i] = None
-                        self.k.vehicle.dropoff(taxi)
+                        edge = self.k.vehicle.get_edge(taxi)
+                        edge_idx = self.edges.index(edge)
+                        is_outside = edge_idx in self.out_edges
+                        self.k.vehicle.dropoff(taxi, is_outside)
+                        if is_outside:
+                            self.outside_taxis.append(taxi)
+                            # self.k.vehicle.remove(taxi)
+                            # self.k.simulation.simulation_step()
+                            # self.k.vehicle.sim
+                            # self.k.kernel_api.vehicle.changeTarget(taxi, edge)
+                            # self.k.kernel_api.vehicle.setStop(taxi, edge, self.outer_length - 0.1, 0)
+                            # self.k.kernel_api.vehicle.rerouteTraveltime(taxi)
+                            # in_edge_idx = np.random.choice(self.in_edges)
+                            # in_edge = self.edges[in_edge_idx]
+                            # x, y = self.edge_position[in_edge_idx][0]
+                            # self.k.vehicle.move2xy(taxi, x, y, in_edge,)
                         res = self.k.vehicle.reservation[taxi]
                         self.k.person.remove(res.persons[0])
             
@@ -751,21 +877,18 @@ class DispatchAndRepositionEnv(Env):
         n_edge = len(self.edges)
         n_taxi = self.num_taxi
 
-        # in/out flow edge cannot be visited by taxi
-        flow_edge = []
-        for i, edge in enumerate(self.edges):
-            if 'flow' in edge:
-                flow_edge.append(i)
-
+        # mid point mask
         if self.__need_mid_edge is not None:
             res = self.k.vehicle.reservation[self.__need_mid_edge]
             from_id, to_id = self.edges.index(res.fromEdge), self.edges.index(res.toEdge)
             taxi_id =  self.taxis.index(self.__need_mid_edge)
             
+            # mask from edge, to edge
             for i in range(self.n_mid_edge):
                 self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + from_id] = True
                 self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + to_id] = True
-                for j in flow_edge:
+                # mask flow edges, in edges and out edges
+                for j in self.flow_edges + self.in_edges + self.out_edges:
                     self.action_mask[taxi_id][n_edge + n_taxi + 1 + i * n_edge + j] = True
 
             if self.n_mid_edge == 0:
@@ -803,19 +926,32 @@ class DispatchAndRepositionEnv(Env):
 
             cur_edge = self.k.vehicle.get_edge(taxi)
             assert cur_edge != ""
+
+            # reposition mask, mask current edge
             if cur_edge in self.edges:
                 edge_id = self.edges.index(cur_edge)
                 self.action_mask[i][edge_id] = True
 
-            for j in flow_edge:
+            # reposition mask, mask flow edges, in edges and out edges
+            for j in self.flow_edges + self.in_edges + self.out_edges:
                 self.action_mask[i][j] = True
 
+            # taxi mask
             if len(self.__reservations) > 0:
                 res = self.__reservations[0]
                 edge = self.k.vehicle.get_edge(taxi)
                 pos = self.k.vehicle.get_position(taxi)
+                # Do not dispath the order to the taxi on out edges
+                edge_idx = self.edges.index(edge) if edge in self.edges else -1
                 if edge == res.fromEdge and pos > res.departPos:
                     self.action_mask[self.num_taxi][n_edge + i] = True
+                if edge_idx in self.out_edges:
+                    self.action_mask[self.num_taxi][n_edge + i] = True
+                for edge in self.k.vehicle.get_route(taxi):
+                    if self.edges.index(edge) in self.out_edges:
+                        self.action_mask[self.num_taxi][n_edge + i] = True
+                        break
+                
                 # from_id = self.edges.index(res.fromEdge)    
                 # to_id = self.edges.index(res.toEdge)
                 # for i in range(self.n_mid_edge):

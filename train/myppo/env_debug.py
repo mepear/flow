@@ -6,6 +6,7 @@ import sys
 import time
 from collections import deque
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
+import shutil 
 
 import gym
 import numpy as np
@@ -41,6 +42,7 @@ def env_debug(flow_params=None):
     device = torch.device("cuda:0" if args.cuda else "cpu")
 
     save_path = os.path.join(os.path.join(args.save_dir, args.algo), 'debug')
+    shutil.rmtree(save_path)
     os.makedirs(save_path, exist_ok=True)
     # actor_critic, ob_rms = torch.load(pt, map_location='cpu')
 

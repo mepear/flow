@@ -295,6 +295,8 @@ class BaseKernelNetwork(object):
                 startpositions.extend(pos)
                 startlanes.extend(lane)
             return startpositions, startlanes
+        elif initial_config.edges_distribution == 'inner':
+            initial_config.edges_distribution = [edge for edge in self.get_edge_list() if 'in' not in edge and 'out' not in edge]
 
         (x0, min_gap, bunching, lanes_distr, available_length,
          available_edges, initial_config) = \
@@ -420,6 +422,8 @@ class BaseKernelNetwork(object):
                 startpositions.extend(pos)
                 startlanes.extend(lane)
             return startpositions, startlanes
+        elif initial_config.edges_distribution == 'inner':
+            initial_config.edges_distribution = [edge for edge in self.get_edge_list() if 'in' not in edge and 'out' not in edge]
 
         (x0, min_gap, bunching, lanes_distr, available_length,
          available_edges, initial_config) = self._get_start_pos_util(

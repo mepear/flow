@@ -4,13 +4,22 @@ def gen_request(env):
     tp = 0
     if env.distribution == 'random':
         idx = env.k.person.total
-        edge_list = env.edges.copy()
-        edge_id1 = np.random.choice(edge_list)
-        edge_list.remove(edge_id1)
-        edge_id2 = np.random.choice(edge_list)
+        in_edge_list = [edge for edge in env.edges.copy() if 'out' not in edge and 'in' not in edge]
+        edge_id1 = np.random.choice(in_edge_list)
+        # out_edge_list = [edge for edge in env.edges.copy() if 'in' not in edge]
+        # for debug 
+        # out_edge_list = [edge for edge in env.edges.copy() if 'out' in edge]
+        out_edge_list = [edge for edge in env.edges.copy() if 'out' not in edge and 'in' not in edge]
+        
+        if edge_id1 in out_edge_list:
+            out_edge_list.remove(edge_id1)
+        edge_id2 = np.random.choice(out_edge_list)
 
         per_id = 'per_' + str(idx)
-        pos = np.random.uniform(20, env.inner_length - 20)
+        if 'in' not in edge_id1:
+            pos = np.random.uniform(20, env.inner_length - 20)
+        else:
+            pos = env.outer_length - 1
     elif env.distribution == 'mode-1': 
         # the request only appears at one edge
         idx = env.k.person.total

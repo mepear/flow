@@ -193,7 +193,7 @@ class TraCIVehicle(KernelVehicle):
                 crash = True
             # remove exiting vehicles from the vehicle subscription if they
             # haven't been removed already
-            if vehicle_obs[veh_id] is None:
+            if vehicle_obs.get(veh_id) is None:
                 vehicle_obs.pop(veh_id, None)
         self._arrived_rl_ids.append(arrived_rl_ids)
 
@@ -1265,7 +1265,8 @@ class TraCIVehicle(KernelVehicle):
         cur_edge = self.kernel_api.vehicle.getRoadID(veh_id)
         stops = self.kernel_api.vehicle.getStops(veh_id)
         if len(stops) > 0:
-            # self.kernel_api.vehicle.resume(veh_id)
+            # if self.kernel_api.vehicle.isStopped(veh_id):
+            #     self.kernel_api.vehicle.resume(veh_id)
             self.kernel_api.vehicle.replaceStop(veh_id, 0, stops[0].lane[:-2], stops[0].endPos, 0, 0)
 
         from_edge = reservation.fromEdge
@@ -1275,7 +1276,8 @@ class TraCIVehicle(KernelVehicle):
         self.reservation[veh_id] = reservation
         self.pickup_stop[veh_id] = [ reservation.fromEdge, reservation.departPos ]
         # self.mid_edges[veh_id] = mid_edges
-        self.dropoff_stop[veh_id] = [ reservation.toEdge, 25 ]
+        to_lane_len = self.kernel_api.lane.getLength(reservation.toEdge + '_0')
+        self.dropoff_stop[veh_id] = [ reservation.toEdge, to_lane_len / 2 ]
         self.__free_taxis.remove(veh_id)
         self.__pickup_taxis.add(veh_id)
 
@@ -1302,11 +1304,16 @@ class TraCIVehicle(KernelVehicle):
         self.kernel_api.vehicle.setRoute(veh_id, route.edges)
         self.kernel_api.vehicle.setSpeed(veh_id, -1)
 
-    def dropoff(self, veh_id):
+    def move2xy(self, veh_id, x, y, edge='', lane='0', keepRoute=0):
+        self.k.kernel_api.vehicle.moveToXY(veh_id, edge, lane=lane, x=x, y=y, keepRoute=0)
+    
+    def dropoff(self, veh_id, is_outside=False):
         self.__occupied_taxis.remove(veh_id)
         self.__free_taxis.add(veh_id)
-        self.stop(veh_id)
         self.kernel_api.vehicle.setSpeed(veh_id, -1)
+
+        if not is_outside:
+            self.stop(veh_id)
 
     def stop(self,veh_id):
         cur_edge = self.get_edge(veh_id)
@@ -1340,4 +1347,4 @@ class TraCIVehicle(KernelVehicle):
             return
         self.kernel_api.vehicle.resume(veh_id)
         self.kernel_api.vehicle.changeTarget(veh_id, edge_id)
-        self.kernel_api.vehicle.setStop(veh_id, edge_id, 25, 0)
+        self.kernel_api.vehicle.setStop(veh_id, edge_id, 25, 0, 600)
