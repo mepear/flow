@@ -7,6 +7,7 @@ through an n x m traffic light grid.
 import numpy as np
 import re
 import random
+from numpy.core.fromnumeric import _nonzero_dispatcher
 import torch
 import os
 import time
@@ -136,6 +137,7 @@ class DispatchAndRepositionEnv(Env):
 
         self.mean_velocity = np.zeros(len(self.edges))
         self.total_co2 = np.zeros(len(self.edges))
+        self.valid_distance = 0
         self.background_velocity = np.zeros(len(self.background_cars))
         self.background_co2 = np.zeros(len(self.background_cars))
         self.taxi_velocity = np.zeros(len(self.taxis))
@@ -432,6 +434,7 @@ class DispatchAndRepositionEnv(Env):
         self.congestion_rate = 0
         self.mean_velocity = np.zeros(len(self.edges))
         self.total_co2 = np.zeros(len(self.edges))
+        self.valid_distance = 0
         self.background_velocity = np.zeros(len(self.background_cars))
         self.background_co2 = np.zeros(len(self.background_cars))
         self.taxi_velocity = np.zeros(len(self.taxis))
@@ -671,6 +674,8 @@ class DispatchAndRepositionEnv(Env):
         # price about time 
         reward += len(occupied_taxi) * self.time_price * timestep
         
+
+        self.valid_distance = 0
         for i, taxi in enumerate(self.taxis):
             # price about distance
             if taxi in occupied_taxi and self.taxi_states[taxi]['pickup_distance'] and distances[i] - self.taxi_states[taxi]['pickup_distance'] > self.starting_distance:
@@ -684,6 +689,7 @@ class DispatchAndRepositionEnv(Env):
                 assert distances[i] >= self.taxi_states[taxi]['distance'], (distances[i], self.taxi_states[taxi]['distance'])
                 if taxi in occupied_taxi:
                     self.total_valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
+                    self.valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                     self.total_valid_time += timestep
                 elif taxi in pickup_taxi:
                     self.total_pickup_distance += (distances[i] - self.taxi_states[taxi]['distance'])
@@ -696,7 +702,9 @@ class DispatchAndRepositionEnv(Env):
                 self.taxi_states[taxi]['pickup_distance'] = None
                 self.num_complete_orders += 1
         # co2 penalty
-        reward -= self.total_co2.sum() * 1e-3 * self.co2_penalty
+        # reward -= self.total_co2.sum() * 1e-3 * self.co2_penalty
+        nonzero_distance = self.valid_distance or 0.01
+        reward -= self.total_co2.sum() * 1e-3 / nonzero_distance * self.co2_penalty
 
         # normalizing_term = len(self.taxis) * \
             # (self.pickup_price + timestep * self.time_price + 55.55 * timestep * self.distance_price) # default maxSpeed = 55.55 m/s
