@@ -138,10 +138,13 @@ class DispatchAndRepositionEnv(Env):
         self.mean_velocity = np.zeros(len(self.edges))
         self.total_co2 = np.zeros(len(self.edges))
         self.valid_distance = 0
+        self.valid_taxi_distances = np.zeros(len(self.taxis))
         self.background_velocity = np.zeros(len(self.background_cars))
         self.background_co2 = np.zeros(len(self.background_cars))
         self.taxi_velocity = np.zeros(len(self.taxis))
         self.taxi_co2 = np.zeros(len(self.taxis))
+        self.background_co = np.zeros(len(self.background_cars))
+        self.taxi_co = np.zeros(len(self.taxis))
         self.edge_position = [(self.k.kernel_api.simulation.convert2D(edge, 0), \
             self.k.kernel_api.simulation.convert2D(edge, self.k.kernel_api.lane.getLength(edge + '_0')), \
             self.k.kernel_api.lane.getWidth(edge + '_0')) \
@@ -435,10 +438,13 @@ class DispatchAndRepositionEnv(Env):
         self.mean_velocity = np.zeros(len(self.edges))
         self.total_co2 = np.zeros(len(self.edges))
         self.valid_distance = 0
+        self.valid_taxi_distances = np.zeros(len(self.taxis))
         self.background_velocity = np.zeros(len(self.background_cars))
         self.background_co2 = np.zeros(len(self.background_cars))
         self.taxi_velocity = np.zeros(len(self.taxis))
         self.taxi_co2 = np.zeros(len(self.taxis))
+        self.background_co = np.zeros(len(self.background_cars))
+        self.taxi_co = np.zeros(len(self.taxis))
         self.stop_time = [None] * len(self.taxis)
         self.outside_taxis = []
         self.statistics = {
@@ -566,21 +572,27 @@ class DispatchAndRepositionEnv(Env):
             try:
                 speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
                 co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+                co = self.k.kernel_api.vehicle.getCOEmission(vehicle)
             except TraCIException:
                 speed = 0
                 co2 = 0
+                co = 0
             self.background_velocity[i] = speed
             self.background_co2[i] = co2
+            self.background_co[i] = co
         
         for i, vehicle in enumerate(self.taxis):
             try:
                 speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
                 co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
+                co = self.k.kernel_api.vehicle.getCOEmission(vehicle)
             except TraCIException:
                 speed = 0
                 co2 = 0
+                co = 0
             self.taxi_velocity[i] = speed
             self.taxi_co2[i] = co2
+            self.taxi_co[i] = co
 
         # collect the free vehicle density
         if 'free' not in self.statistics['route']:
@@ -676,6 +688,7 @@ class DispatchAndRepositionEnv(Env):
         
 
         self.valid_distance = 0
+        self.valid_taxi_distances = np.zeros(len(self.taxis))
         for i, taxi in enumerate(self.taxis):
             # price about distance
             if taxi in occupied_taxi and self.taxi_states[taxi]['pickup_distance'] and distances[i] - self.taxi_states[taxi]['pickup_distance'] > self.starting_distance:
@@ -690,10 +703,12 @@ class DispatchAndRepositionEnv(Env):
                 if taxi in occupied_taxi:
                     self.total_valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                     self.valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
+                    # self.valid_taxi_distances[i] = (distances[i] - self.taxi_states[taxi]['distance'])
                     self.total_valid_time += timestep
                 elif taxi in pickup_taxi:
                     self.total_pickup_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                     self.total_pickup_time += timestep
+                self.valid_taxi_distances[i] = (distances[i] - self.taxi_states[taxi]['distance'])
                 self.taxi_states[taxi]['distance'] = distances[i]
 
             # check empty

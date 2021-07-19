@@ -143,6 +143,9 @@ class Monitor(gym.Wrapper):
         info['background_co2'] = self.env.background_co2.copy()
         info['taxi_velocity'] = self.env.taxi_velocity.copy()
         info['taxi_co2'] = self.env.taxi_co2.copy()
+        info['background_co'] = self.env.background_co.copy()
+        info['taxi_co'] = self.env.taxi_co.copy()
+        info['valid_taxi_distance'] = self.env.valid_taxi_distances
 
         self.total_steps += 1
         return observation, reward, done, info
