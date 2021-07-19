@@ -102,6 +102,7 @@ class DispatchAndRepositionEnv(Env):
         self.stop_distance_eps = env_params.additional_params['stop_distance_eps']
         
         self.distribution = env_params.additional_params['distribution']
+        self.distribution_random_ratio = env_params.additional_params.get('distribution_random_ratio', 0.5)
         # print(self.distribution)
         super().__init__(env_params, sim_params, network, simulator)
 
