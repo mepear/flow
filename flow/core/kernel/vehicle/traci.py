@@ -168,7 +168,9 @@ class TraCIVehicle(KernelVehicle):
         crash = False
 
         # copy over the previous speeds
-
+        assert len(self.__free_taxis) + len(self.__pickup_taxis) + len(self.__occupied_taxis) == 20
+        if reset:
+            assert len(self.__free_taxis) == 20
         vehicle_obs = {}
         for veh_id in self.__ids:
             self.previous_speeds[veh_id] = self.get_speed(veh_id)
@@ -607,6 +609,16 @@ class TraCIVehicle(KernelVehicle):
         if isinstance(veh_id, (list, np.ndarray)):
             return [self.get_speed(vehID, error) for vehID in veh_id]
         return self.__sumo_obs.get(veh_id, {}).get(tc.VAR_SPEED, error)
+    
+    def get_co2_Emission(self, veh_id):
+        factor = 1.6 / 3.6 # mph to m/s
+        speed = self.get_speed(veh_id) / factor
+        if speed < 0:
+            raise TraCIException
+        b0, b1, b2, b3, b4 = 7.36, -0.15, 0.00421, -0.00005, 0.000000217
+        co2_per_mile = np.exp(b0 + b1 * speed + b2 * speed ** 2 + b3 * speed ** 3 + b4 * speed ** 4)
+        co2_per_s = co2_per_mile * speed / 3.6  # mg/s
+        return co2_per_s
 
     def get_default_speed(self, veh_id, error=-1001):
         """See parent class."""

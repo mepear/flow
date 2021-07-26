@@ -107,7 +107,7 @@ class Monitor(gym.Wrapper):
         observation, reward, done, info = self.env.step(action)
         self.rewards.append(reward)
         self.mean_velocities.append(self.env.mean_velocity.copy())
-        self.total_co2s.append(self.env.total_co2.copy())
+        self.total_co2s.append(np.concatenate([self.env.background_co2, self.env.taxi_co2]))
         self.congestion_rates.append(self.env.congestion_rate)
         if done:
             self.needs_reset = True

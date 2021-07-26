@@ -229,7 +229,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     
     if do_plot_congestion:
         plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
-        plot_co_emission(np.array(background_velocities), np.array(background_cos), np.array(taxi_velocities), np.array(taxi_cos), save_path, ckpt, num_processes=num_processes)
+        # plot_co_emission(np.array(background_velocities), np.array(background_cos), np.array(taxi_velocities), np.array(taxi_cos), save_path, ckpt, num_processes=num_processes)
         plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, np.array(valid_taxi_distances), num_processes=num_processes)
 
 

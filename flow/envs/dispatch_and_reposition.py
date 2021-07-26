@@ -137,7 +137,6 @@ class DispatchAndRepositionEnv(Env):
         self.num_vehicles = network.vehicles.num_vehicles
 
         self.mean_velocity = np.zeros(len(self.edges))
-        self.total_co2 = np.zeros(len(self.edges))
         self.valid_distance = 0
         self.valid_taxi_distances = np.zeros(len(self.taxis))
         self.background_velocity = np.zeros(len(self.background_cars))
@@ -163,6 +162,7 @@ class DispatchAndRepositionEnv(Env):
         self.__need_mid_edge = None
 
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
+        self.background_states = dict([[veh_id, {'distance': 0}] for veh_id in self.background_cars])
         self.stop_time = [None] * len(self.taxis)
 
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
@@ -427,6 +427,7 @@ class DispatchAndRepositionEnv(Env):
         self.__reservations = []
         self.__need_reposition = None
         self.taxi_states = dict([[taxi, {"empty": True, "distance": 0, "pickup_distance": None}] for taxi in self.taxis])
+        self.background_states = dict([[veh_id, {'distance': 0}] for veh_id in self.background_cars])
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
         self.num_complete_orders = 0
@@ -437,7 +438,6 @@ class DispatchAndRepositionEnv(Env):
         self.total_wait_time = 0
         self.congestion_rate = 0
         self.mean_velocity = np.zeros(len(self.edges))
-        self.total_co2 = np.zeros(len(self.edges))
         self.valid_distance = 0
         self.valid_taxi_distances = np.zeros(len(self.taxis))
         self.background_velocity = np.zeros(len(self.background_cars))
@@ -552,6 +552,7 @@ class DispatchAndRepositionEnv(Env):
         pickup_taxi = self.k.vehicle.get_taxi_fleet(1)
         occupied_taxi = self.k.vehicle.get_taxi_fleet(2)
         distances = [self.k.vehicle.get_distance(taxi) for taxi in self.taxis]
+        background_distances = [self.k.vehicle.get_distance(veh) for veh in self.background_cars]
         cur_time = self.time_counter * self.sim_params.sim_step
         timestep = self.sim_params.sim_step * self.env_params.sims_per_step
         n_edge = len(self.edges)
@@ -561,9 +562,7 @@ class DispatchAndRepositionEnv(Env):
         for i, edge in enumerate(self.edges):
             n_veh = self.k.kernel_api.edge.getLastStepVehicleNumber(edge)
             mean_vel = self.k.kernel_api.edge.getLastStepMeanSpeed(edge) # if n_veh > 0 else 10.0 # MAX_SPEED = 10.0
-            co2 = self.k.kernel_api.edge.getCO2Emission(edge)
             self.mean_velocity[i] = mean_vel #/ 10.0 / self.env_params.horizon
-            self.total_co2[i] = co2
             if n_veh > 0 and mean_vel < 3.0: # a threshold for congestion
                 num_congestion += 1
         self.congestion_rate = num_congestion / len(self.edges)
@@ -572,28 +571,22 @@ class DispatchAndRepositionEnv(Env):
         for i, vehicle in enumerate(self.background_cars):
             try:
                 speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
-                co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
-                co = self.k.kernel_api.vehicle.getCOEmission(vehicle)
+                co2 = self.k.vehicle.get_co2_Emission(vehicle)
             except TraCIException:
                 speed = 0
                 co2 = 0
-                co = 0
             self.background_velocity[i] = speed
             self.background_co2[i] = co2
-            self.background_co[i] = co
         
         for i, vehicle in enumerate(self.taxis):
             try:
                 speed = self.k.kernel_api.vehicle.getSpeed(vehicle)
-                co2 = self.k.kernel_api.vehicle.getCO2Emission(vehicle)
-                co = self.k.kernel_api.vehicle.getCOEmission(vehicle)
+                co2 = self.k.vehicle.get_co2_Emission(vehicle)
             except TraCIException:
                 speed = 0
                 co2 = 0
-                co = 0
             self.taxi_velocity[i] = speed
             self.taxi_co2[i] = co2
-            self.taxi_co[i] = co
 
         # collect the free vehicle density
         if 'free' not in self.statistics['route']:
@@ -703,14 +696,20 @@ class DispatchAndRepositionEnv(Env):
                 assert distances[i] >= self.taxi_states[taxi]['distance'], (distances[i], self.taxi_states[taxi]['distance'])
                 if taxi in occupied_taxi:
                     self.total_valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
-                    self.valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
-                    # self.valid_taxi_distances[i] = (distances[i] - self.taxi_states[taxi]['distance'])
                     self.total_valid_time += timestep
                 elif taxi in pickup_taxi:
                     self.total_pickup_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                     self.total_pickup_time += timestep
+                # self.valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                 self.valid_taxi_distances[i] = (distances[i] - self.taxi_states[taxi]['distance'])
                 self.taxi_states[taxi]['distance'] = distances[i]
+        
+        background_distances = np.zeros(len(self.background_cars))
+        for i, veh in enumerate(self.background_cars):
+            if background_distances[i] > 0:
+                assert background_distances[i] >= self.background_cars[veh]['distance'], (background_distances[i], self.background_cars[veh])
+                background_distances[i] = (background_distances[i] - self.background_states[veh]['distance'])
+                self.background_states[veh]['distance'] = background_distances[i]
 
             # check empty
             if taxi not in occupied_taxi and not self.taxi_states[taxi]['empty']:
@@ -719,8 +718,11 @@ class DispatchAndRepositionEnv(Env):
                 self.num_complete_orders += 1
         # co2 penalty
         # reward -= self.total_co2.sum() * 1e-3 * self.co2_penalty
-        nonzero_distance = self.valid_distance or 0.01
-        reward -= self.total_co2.sum() * 1e-3 / nonzero_distance * self.co2_penalty
+        # nonzero_distance = self.valid_distance or 0.01
+        # reward -= self.total_co2.sum() * 1e-3 / nonzero_distance * self.co2_penalty
+
+        nonzero_distance = (self.valid_taxi_distances.sum() + background_distances.sum()) or 0.01
+        reward -= (self.taxi_co2.sum() + self.background_co2.sum()) * 1e-3 / nonzero_distance * self.co2_penalty
 
         # normalizing_term = len(self.taxis) * \
             # (self.pickup_price + timestep * self.time_price + 55.55 * timestep * self.distance_price) # default maxSpeed = 55.55 m/s
