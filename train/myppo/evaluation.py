@@ -41,7 +41,8 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     taxi_co2s = [[] for _ in range(eval_envs.num_envs)]
     background_cos = [[] for _ in range(eval_envs.num_envs)]
     taxi_cos = [[] for _ in range(eval_envs.num_envs)]
-    valid_taxi_distances = [[] for _ in range(eval_envs.num_envs)]
+    total_taxi_distances = [[] for _ in range(eval_envs.num_envs)]
+    total_back_distances = [[] for _ in range(eval_envs.num_envs)]
     edge_position = None
     statistics = []
 
@@ -83,7 +84,8 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
             taxi_co2s[i].append(info['taxi_co2'])
             background_cos[i].append(info['background_co'])
             taxi_cos[i].append(info['taxi_co'])
-            valid_taxi_distances[i].append(info['valid_taxi_distance'])
+            total_taxi_distances[i].append(info['total_taxi_distance'])
+            # total_back_distances[i].append(info['total_back_distance'])
             if 'episode' in info.keys():
                 eval_episode_rewards.append(info['episode']['r'])
                 nums_orders.append(info['episode']['num_orders'])
@@ -91,6 +93,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 total_pickup_distances.append(info['episode']['total_pickup_distance'])
                 total_pickup_times.append(info['episode']['total_pickup_time'])
                 total_valid_distances.append(info['episode']['total_valid_distance'])
+                # total_distances[i].append(info['episode']['total_distance'])
                 total_valid_times.append(info['episode']['total_valid_time'])
                 total_wait_times.append(info['episode']['total_wait_time'])
                 total_congestion_rates.append(np.mean(info['episode']['congestion_rates']))
@@ -230,7 +233,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     if do_plot_congestion:
         plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
         # plot_co_emission(np.array(background_velocities), np.array(background_cos), np.array(taxi_velocities), np.array(taxi_cos), save_path, ckpt, num_processes=num_processes)
-        plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, np.array(valid_taxi_distances), num_processes=num_processes)
+        plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, np.array(total_taxi_distances), num_processes=num_processes)
 
 
 def get_corners(s, e, w):
@@ -253,7 +256,7 @@ def plot(statistics, edge_position, key1, key2, name, n, m, idx, cmap, tp=None):
     x_min, x_max, y_min, y_max = 1e9, -1e9, 1e9, -1e9
     for cnt, (start, end, width) in zip(cnts, edge_position):
         vertices = get_corners(start, end, width)
-        assert cnt >= 0 and cnt <= 1
+        assert cnt >= 0 and cnt <= 1, cnts
         poly = Polygon(vertices)
         colors.append(cnt)
         patches.append(poly)
@@ -317,10 +320,10 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     # plt.savefig(os.path.join(save_path, 'distribution_{}.jpg'.format(ckpt)), dpi=500)
 
     plotter = partial(plot, statistics, edge_position)
-    draw(plotter, 3, cmap, ckpt, save_path)
+    draw(plotter, 2, cmap, ckpt, save_path)
 
 
-def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_co2s, save_path, ckpt, valid_taxi_distances, num_processes=100):
+def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_co2s, save_path, ckpt, total_distances, num_processes=100):
 
     # background_velocities = background_velocities[:, 1:, :]
     # taxi_velocities = taxi_velocities[:, 1:, :]
@@ -358,12 +361,12 @@ def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_
 
         co2_over_dis = co2 / distance
         co2_over_dis = co2_over_dis[~ np.isinf(co2_over_dis)]
-        print(f'eval/co2@distance of {title} mean {(co2.sum() / distance.sum()).mean()} median {np.median(co2.sum() / distance.sum())}')
+        print(f'eval/co2@distance of {title} mean {round(co2.sum() / distance.sum(), 3)}')
         ax.set_title('co2@distance of vehicles')
         ax.set_xlabel('Co2 (mg/m)')
         ax.set_ylabel('Number')
 
-        ax.hist(co2_over_dis, 100, range=(0, 3000))
+        ax.hist(co2_over_dis, 100, range=(0, 500))
     
     def _plot(velocities, co2s, title):
         fig, axs = plt.subplots(1, 2)
@@ -384,7 +387,7 @@ def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_
     _plot(np.concatenate([background_velocities, taxi_velocities], axis=-1), 
     np.concatenate([background_co2s, taxi_co2s], axis=-1), 'all_vehicles')
 
-    _plot_over_distance(taxi_velocities, taxi_co2s, valid_taxi_distances, 'CO2@valid_distance')
+    _plot_over_distance(taxi_velocities, taxi_co2s, total_distances, 'CO2@valid_distance')
 
     fig, axs = plt.subplots(2, 1)
     velocity = taxi_velocities[0, :, 0]

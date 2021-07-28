@@ -124,6 +124,7 @@ class Monitor(gym.Wrapper):
             ep_info['total_pickup_distance'] = self.env.total_pickup_distance
             ep_info['total_pickup_time'] = self.env.total_pickup_time
             ep_info['total_valid_distance'] = self.env.total_valid_distance
+            ep_info['total_distance'] = self.env.total_distance
             ep_info['total_valid_time'] = self.env.total_valid_time
             ep_info['total_wait_time'] = self.env.total_wait_time
             ep_info['congestion_rates'] = self.congestion_rates
@@ -145,7 +146,8 @@ class Monitor(gym.Wrapper):
         info['taxi_co2'] = self.env.taxi_co2.copy()
         info['background_co'] = self.env.background_co.copy()
         info['taxi_co'] = self.env.taxi_co.copy()
-        info['valid_taxi_distance'] = self.env.valid_taxi_distances
+        info['total_taxi_distance'] = self.env.total_taxi_distances
+        info['total_back_distance'] = self.env.total_back_distances
 
         self.total_steps += 1
         return observation, reward, done, info

@@ -93,6 +93,7 @@ class DispatchAndRepositionEnv(Env):
 
         self.num_complete_orders = 0
         self.total_valid_distance = 0
+        self.total_distance = 0
         self.total_valid_time = 0
         self.total_pickup_distance = 0
         self.total_pickup_time = 0
@@ -138,7 +139,7 @@ class DispatchAndRepositionEnv(Env):
 
         self.mean_velocity = np.zeros(len(self.edges))
         self.valid_distance = 0
-        self.valid_taxi_distances = np.zeros(len(self.taxis))
+        self.total_taxi_distances = np.zeros(len(self.taxis))
         self.background_velocity = np.zeros(len(self.background_cars))
         self.background_co2 = np.zeros(len(self.background_cars))
         self.taxi_velocity = np.zeros(len(self.taxis))
@@ -432,6 +433,7 @@ class DispatchAndRepositionEnv(Env):
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
         self.num_complete_orders = 0
         self.total_valid_distance = 0
+        self.total_distance = 0
         self.total_valid_time = 0
         self.total_pickup_distance = 0
         self.total_pickup_time = 0
@@ -439,7 +441,7 @@ class DispatchAndRepositionEnv(Env):
         self.congestion_rate = 0
         self.mean_velocity = np.zeros(len(self.edges))
         self.valid_distance = 0
-        self.valid_taxi_distances = np.zeros(len(self.taxis))
+        self.total_taxi_distances = np.zeros(len(self.taxis))
         self.background_velocity = np.zeros(len(self.background_cars))
         self.background_co2 = np.zeros(len(self.background_cars))
         self.taxi_velocity = np.zeros(len(self.taxis))
@@ -682,7 +684,7 @@ class DispatchAndRepositionEnv(Env):
         
 
         self.valid_distance = 0
-        self.valid_taxi_distances = np.zeros(len(self.taxis))
+        self.total_taxi_distances = np.zeros(len(self.taxis))
         for i, taxi in enumerate(self.taxis):
             # price about distance
             if taxi in occupied_taxi and self.taxi_states[taxi]['pickup_distance'] and distances[i] - self.taxi_states[taxi]['pickup_distance'] > self.starting_distance:
@@ -701,27 +703,30 @@ class DispatchAndRepositionEnv(Env):
                     self.total_pickup_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                     self.total_pickup_time += timestep
                 # self.valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
-                self.valid_taxi_distances[i] = (distances[i] - self.taxi_states[taxi]['distance'])
+                self.total_taxi_distances[i] = (distances[i] - self.taxi_states[taxi]['distance'])
                 self.taxi_states[taxi]['distance'] = distances[i]
         
-        background_distances = np.zeros(len(self.background_cars))
-        for i, veh in enumerate(self.background_cars):
-            if background_distances[i] > 0:
-                assert background_distances[i] >= self.background_cars[veh]['distance'], (background_distances[i], self.background_cars[veh])
-                background_distances[i] = (background_distances[i] - self.background_states[veh]['distance'])
-                self.background_states[veh]['distance'] = background_distances[i]
-
             # check empty
             if taxi not in occupied_taxi and not self.taxi_states[taxi]['empty']:
                 self.taxi_states[taxi]['empty'] = True
                 self.taxi_states[taxi]['pickup_distance'] = None
                 self.num_complete_orders += 1
+
+        self.total_back_distances = np.zeros(len(self.background_cars))
+        for i, veh in enumerate(self.background_cars):
+            if background_distances[i] > 0:
+                assert background_distances[i] >= self.background_states[veh]['distance'], (background_distances[i], self.background_states[veh])
+                self.total_back_distances[i] = (background_distances[i] - self.background_states[veh]['distance'])
+                # self.total_distance += (background_distances[i] - self.background_states[veh]['distance'])
+                self.background_states[veh]['distance'] = background_distances[i]
+        
+        self.total_distance = sum([self.taxi_states[taxi]['distance'] for taxi in self.taxis] + [self.background_states[veh]['distance'] for veh in self.background_cars])
         # co2 penalty
         # reward -= self.total_co2.sum() * 1e-3 * self.co2_penalty
         # nonzero_distance = self.valid_distance or 0.01
         # reward -= self.total_co2.sum() * 1e-3 / nonzero_distance * self.co2_penalty
 
-        nonzero_distance = (self.valid_taxi_distances.sum() + background_distances.sum()) or 0.01
+        nonzero_distance = (self.total_taxi_distances.sum() + self.total_back_distances.sum()) or 0.01
         reward -= (self.taxi_co2.sum() + self.background_co2.sum()) * 1e-3 / nonzero_distance * self.co2_penalty
 
         # normalizing_term = len(self.taxis) * \
