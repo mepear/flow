@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+import copy
 import torch.nn.functional as F
 
 # from a2c_ppo_acktr.utils import AddBias, init
@@ -100,14 +101,28 @@ class FixedMultiCategorical:
     def log_probs(self, actions):
         try:
             # actions_mask = actions == -1
-            actions.masked_fill_(self.is_all_inf_mask, 0)
+
+            tmp_actions = copy.deepcopy(actions)
+            tmp_actions.masked_fill_(actions == -1, 0)
             log_probs_all = torch.stack(
-                    [dist.log_prob(action) for dist, action in zip(self.distributions, torch.unbind(actions, dim=1))], dim=1
+                    [dist.log_prob(action) for dist, action in zip(self.distributions, torch.unbind(tmp_actions, dim=1))], dim=1
                 )
-            log_probs_all.masked_fill_(self.is_all_inf_mask, 0)
+            log_probs_all.masked_fill_(actions == -1, 0)
             return log_probs_all.sum(dim=1).unsqueeze(-1)
         except Exception as e:
             print(e)
+            for dist, action, mask in zip(self.distributions, torch.unbind(tmp_actions, dim=1), torch.unbind(self.is_all_inf_mask, dim=1)):
+                print("****** Distribution ******")
+                print(dist)
+                print("*" * 5, "logits", "*" * 5)
+                print(dist.logits)
+                print("****** Action ******")
+                print(action)
+                print("****** Origin Actions ******")
+                print(actions)
+                print("****** Mask ******")
+                print(mask)
+                print("****** End ******")
 
     def entropy(self):
         ent = torch.stack(
