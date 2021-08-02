@@ -315,11 +315,12 @@ class DispatchAndRepositionEnv(Env):
         # )
         # return Tuple((edges_feature, taxi_feature, order_feature))
         state_box = Box(
-            low=-500,
-            high=500,
+            low=np.float32(-500),
+            high=np.float32(500),
             shape=( 1 + len(self.edges) + self.num_taxi * 9 + \
                 int(self.use_tl) * self.n_tl * (self.n_phase + 1) + \
-                self.max_num_order * 5 + (4 + len(self.taxis)) + self.num_taxi + 2, )
+                self.max_num_order * 5 + (4 + len(self.taxis)) + self.num_taxi + 2, ),
+            dtype=np.float32
         )
         return state_box
 
