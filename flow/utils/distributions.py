@@ -121,6 +121,20 @@ def gen_request(env):
             tp = 1
         per_id = 'per_' + str(idx)
         pos = np.random.uniform(20, env.inner_length - 20)
+    elif env.distribution == 'mode-X2-mid':
+        idx = env.k.person.total
+        t =  env.time_counter / env.env_params.sims_per_step / env.env_params.horizon
+        rn = np.random.rand()
+        if t < 0.5:
+            edge_id1 = 'bot3_1_0'
+            edge_id2 = 'top0_2_0'
+            tp = 0
+        else:
+            edge_id1 = 'top3_3_0'
+            edge_id2 = 'bot0_2_0'
+            tp = 1
+        per_id = 'per_' + str(idx)
+        pos = np.random.uniform(20, env.inner_length - 20)
     elif env.distribution == 'mode-X3':
         idx = env.k.person.total
         rn, rn2 =  np.random.rand(), np.random.rand()
