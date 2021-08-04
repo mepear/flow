@@ -107,6 +107,10 @@ class DispatchAndRepositionEnv(Env):
         # print(self.distribution)
         super().__init__(env_params, sim_params, network, simulator)
 
+        (self.min_x, self.min_y), (self.max_x, self.max_y) = self.k.kernel_api.simulation.getNetBoundary()
+        self.abs_max_x = max(np.abs(self.min_x), self.max_x)
+        self.abs_max_y = max(np.abs(self.min_y), self.max_y)
+
         # Saving env variables for plotting
         self.steps = env_params.horizon
         self.obs_var_labels = {
@@ -330,7 +334,7 @@ class DispatchAndRepositionEnv(Env):
         time_feature = [self.time_counter / (self.env_params.horizon * self.env_params.sims_per_step)]
 
         edges_feature = [
-            self.k.kernel_api.edge.getLastStepVehicleNumber(edge) for edge in self.edges
+            self.k.kernel_api.edge.getLastStepVehicleNumber(edge) / (len(self.background_cars) + len(self.taxis)) for edge in self.edges
         ]
         taxi_feature = []
         empty_taxi = self.k.vehicle.get_taxi_fleet(0)
@@ -340,10 +344,16 @@ class DispatchAndRepositionEnv(Env):
             while taxi not in self.k.vehicle.get_rl_ids():
                 raise KeyError
             x, y = self.k.vehicle.get_2d_position(taxi, error=(-1, -1))
+            x /= self.abs_max_x
+            y /= self.abs_max_y
             from_x, from_y = self.k.kernel_api.simulation.convert2D(self.k.kernel_api.vehicle.getRoute(taxi)[0], 0)
+            from_x /= self.abs_max_x
+            from_y /= self.abs_max_y
             to_edge = self.k.kernel_api.vehicle.getRoute(taxi)[-1]
             to_pos = self.inner_length - 2 if 'out' not in to_edge else self.outer_length - 2
             to_x, to_y = self.k.kernel_api.simulation.convert2D(to_edge, to_pos)
+            to_x /= self.abs_max_x
+            to_y /= self.abs_max_y
             # cur_taxi_feature = [0, x, y, self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[0]), self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[-1])]
             cur_taxi_feature = [0, 0, 0, x, y, from_x, from_y, to_x, to_y] # use (x, y) or edge id
             cur_taxi_feature[0 if taxi in empty_taxi else 1 if taxi in pickup_taxi else 2] = 1
@@ -373,7 +383,7 @@ class DispatchAndRepositionEnv(Env):
                     else:
                         res_time = t - phase_time
                         break
-                ft[-1] = res_time
+                ft[-1] = res_time / self.steps * 5
                 tl_feature += ft
         
         order_feature = self._get_order_state.tolist()
@@ -383,7 +393,11 @@ class DispatchAndRepositionEnv(Env):
             taxi = self.__need_mid_edge
             res = self.k.vehicle.reservation[taxi]
             from_x, from_y = self.k.kernel_api.simulation.convert2D(res.fromEdge, res.departPos)
+            from_x /= self.abs_max_x
+            from_y /= self.abs_max_y
             to_x, to_y = self.k.kernel_api.simulation.convert2D(res.toEdge, 25)
+            to_x /= self.abs_max_x
+            to_y /= self.abs_max_y
             veh_id = self.taxis.index(taxi)
             index = [0] * len(self.taxis)
             index[veh_id] = 1
@@ -410,6 +424,8 @@ class DispatchAndRepositionEnv(Env):
         if self.__need_reposition:
             # need_reposition_taxi_feature = [self.edges.index(self.k.kernel_api.vehicle.getRoadID(self.__need_reposition)), self.k.vehicle.get_position(self.__need_reposition)]
             x, y = self.k.vehicle.get_2d_position(self.__need_reposition, error=(-1, -1))
+            x /= self.abs_max_x
+            y /= self.abs_max_y
             index[self.taxis.index(self.__need_reposition)] = 1
             need_reposition_taxi_feature = index + [x, y]
         else:
@@ -484,11 +500,15 @@ class DispatchAndRepositionEnv(Env):
 
         count = 0
         for res in self.__reservations:            
-            waiting_time = self.k.kernel_api.person.getWaitingTime(res.persons[0])
+            waiting_time = self.k.kernel_api.person.getWaitingTime(res.persons[0]) / self.max_waiting_time
             # form_edge = res.fromEdge
             # to_edge = res.toEdge
             from_x, from_y = self.k.kernel_api.simulation.convert2D(res.fromEdge, res.departPos)
+            from_x /= self.abs_max_x
+            from_y /= self.abs_max_y
             to_x, to_y = self.k.kernel_api.simulation.convert2D(res.toEdge, res.arrivalPos)
+            to_x /= self.max_x
+            to_y /= self.max_y
             # orders[count] = [ waiting_time, self.edges.index(form_edge), self.edges.index(to_edge) ]
             orders[count] = [waiting_time, from_x, from_y, to_x, to_y]
             count += 1
