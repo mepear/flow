@@ -373,7 +373,7 @@ class DispatchAndRepositionEnv(Env):
                     else:
                         res_time = t - phase_time
                         break
-                ft[-1] = res_time
+                ft[-1] = res_time / 100
                 tl_feature += ft
         
         order_feature = self._get_order_state.tolist()
