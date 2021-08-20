@@ -168,9 +168,7 @@ class TraCIVehicle(KernelVehicle):
         crash = False
 
         # copy over the previous speeds
-        assert len(self.__free_taxis) + len(self.__pickup_taxis) + len(self.__occupied_taxis) == 20
-        if reset:
-            assert len(self.__free_taxis) == 20
+
         vehicle_obs = {}
         for veh_id in self.__ids:
             self.previous_speeds[veh_id] = self.get_speed(veh_id)
@@ -609,9 +607,9 @@ class TraCIVehicle(KernelVehicle):
         if isinstance(veh_id, (list, np.ndarray)):
             return [self.get_speed(vehID, error) for vehID in veh_id]
         return self.__sumo_obs.get(veh_id, {}).get(tc.VAR_SPEED, error)
-    
+
     def get_co2_Emission(self, veh_id):
-        factor = 1.6 / 3.6 # mph to m/s
+        factor = 1.6 / 3.6  # mph to m/s
         speed = self.get_speed(veh_id) / factor
         if speed < 0:
             raise TraCIException
@@ -1204,11 +1202,11 @@ class TraCIVehicle(KernelVehicle):
     def get_taxi_fleet(self, flag):
         # return self.kernel_api.vehicle.getTaxiFleet(flag)
         if flag == 0:
-            return list(self.__free_taxis)
+            return sorted(list(self.__free_taxis))
         elif flag == 1:
-            return list(self.__pickup_taxis)
+            return sorted(list(self.__pickup_taxis))
         elif flag == 2:
-            return list(self.__occupied_taxis)
+            return sorted(list(self.__occupied_taxis))
 
     def get_max_speed(self, veh_id, error=-1001):
         """See parent class."""
@@ -1313,7 +1311,11 @@ class TraCIVehicle(KernelVehicle):
         to_edge = self.reservation[veh_id].toEdge if len(self.mid_edges[veh_id]) == 0 \
             else self.mid_edges[veh_id][0]
         route = self.kernel_api.simulation.findRoute(cur_edge, to_edge)
-        self.kernel_api.vehicle.setRoute(veh_id, route.edges)
+        try:
+            self.kernel_api.vehicle.setRoute(veh_id, route.edges)
+        except:
+            print(cur_edge)
+            print(route.edges)
         self.kernel_api.vehicle.setSpeed(veh_id, -1)
 
     def move2xy(self, veh_id, x, y, edge='', lane='0', keepRoute=0):

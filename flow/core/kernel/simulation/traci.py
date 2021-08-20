@@ -5,6 +5,7 @@ from flow.core.util import ensure_dir
 import flow.config as config
 import traci.constants as tc
 import traci
+import sumolib
 import traceback
 import os
 import time
@@ -176,7 +177,9 @@ class TraCISimulation(KernelSimulation): # TODO: add person & update kernel api
             ensure_dir(self.emission_path)
 
         error = None
-        for _ in range(RETRIES_ON_ERROR):
+        for try_idx in range(RETRIES_ON_ERROR):
+            if try_idx != 0:
+                sim_params.port = sumolib.miscutils.getFreeSocketPort()
             try:
                 # port number the sumo instance will be run on
                 port = sim_params.port

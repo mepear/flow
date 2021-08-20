@@ -424,7 +424,7 @@ class Env(gym.Env, metaclass=ABCMeta):
             self.render()
 
         # compute the info for each agent
-        infos = self._get_infos() if hasattr(self, '_get_infos') else {}
+        # infos = self._get_infos() if hasattr(self, '_get_infos') else {}
 
         if not crash:
             states = self.get_state()
@@ -457,6 +457,7 @@ class Env(gym.Env, metaclass=ABCMeta):
         else:
             reward = self.compute_reward(rl_actions, fail=crash)
 
+        infos = self._get_infos() if hasattr(self, '_get_infos') else {}
         return next_observation, reward, done, infos
 
     def reset(self):

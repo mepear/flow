@@ -15,9 +15,9 @@ ADDITIONAL_NET_PARAMS = {
         "col_num": 3,
         # length of inner edges in the traffic light grid network
         "inner_length": None,
-        # split a edge to several sub-edges, the number of sub-edges
-        "outer_length": None,
         # length of outer edges in the traffic light grid network
+        "outer_length": None,
+        # split a edge to several sub-edges, the number of sub-edges
         "sub_edge_num": 1,
     },
     # number of lanes in the horizontal edges
@@ -70,6 +70,7 @@ class GridnxmNetwork(Network):
     >>>                 'row_num': 3,
     >>>                 'col_num': 2,
     >>>                 'inner_length': 500,
+    >>>                 'sub_edge_num': 1,
     >>>             },
     >>>             'horizontal_lanes': 1,
     >>>             'vertical_lanes': 1,
@@ -117,10 +118,10 @@ class GridnxmNetwork(Network):
         self.col_num = self.grid_array["col_num"]
         self.inner_length = self.grid_array["inner_length"]
         self.outer_length = self.grid_array.get("outer_length", None)
-        self.sub_edge_num = self.grid_array["sub_edge_num"]
+        self.sub_edge_num = self.grid_array.get("sub_edge_num", 1)
 
         # specifies whether or not there will be traffic lights at the
-        # intersections (True by default)
+        # intersections (False by default)
         self.use_traffic_lights = net_params.additional_params.get(
             "traffic_lights", False)
 
@@ -182,7 +183,7 @@ class GridnxmNetwork(Network):
             for col in range(self.col_num):
                 for n in range(self.sub_edge_num - 1):
                     cur_id = row * self.col_num + col
-                    
+
                     if col < self.col_num - 1:
                         inserted_nodes.append({
                             "id": "{}-{}_{}".format(cur_id, cur_id + 1, n),
@@ -253,7 +254,7 @@ class GridnxmNetwork(Network):
                     new_edges.append({
                         "id": "{}{}_{}".format(lane, index, i),
                         "type": orientation,
-                        "priority": 78,
+                        "priority": 78,  # Why 78?
                         "from": node,
                         "to": node_list[i + 1],
                         "length": self.inner_length / self.sub_edge_num
@@ -328,6 +329,12 @@ class GridnxmNetwork(Network):
         """
         con_dict = {}
 
+        # specify certain connections for given edge pair
+        # In form of {"from" : edge id,
+        #             "to" : edge id, \
+        #             "fromLane":(sub-edge of a certain edge and it is by default 0) : {number between 0 to self.lanes - 1},
+        #             "toLane":{number between 0 to self.lanes - 1}}
+
         def new_con(side, from_id, to_id, signal_group, toside=None, from_sub_id=0, to_sub_id=0, inv=False):
             if toside is None:
                 toside = side
@@ -337,12 +344,12 @@ class GridnxmNetwork(Network):
             for lane1 in lane1s:
                 for lane2 in range(self.vertical_lanes):
                     conn.append({
-                    "from": side + from_id + "_{}".format(from_sub_id),
-                    "to": toside + to_id + "_{}".format(to_sub_id),
-                    "fromLane": str(lane1),
-                    "toLane": str(lane2),                        
+                        "from": side + from_id + "_{}".format(from_sub_id),
+                        "to": toside + to_id + "_{}".format(to_sub_id),
+                        "fromLane": str(lane1),
+                        "toLane": str(lane2),
                     })
-                
+
             # conn = [{
             #     "from": side + from_id + "_{}".format(from_sub_id),
             #     "to": toside + to_id + "_{}".format(to_sub_id)

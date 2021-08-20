@@ -123,11 +123,14 @@ class DispatchAndRepositionEnv(Env):
         for i, edge in enumerate(self.edges):
             if 'flow' in edge:
                 self.flow_edges.append(i)
+            elif '0_0_0' in edge:
+                self.flow_edges.append(i)
+            elif '3_4_0' in edge:
+                self.flow_edges.append(i)
             elif 'in' in edge:
                 self.in_edges.append(i)
             elif 'out' in edge:
                 self.out_edges.append(i)
-
         self._preprocess()
 
         self.num_taxi = network.vehicles.num_rl_vehicles
@@ -167,9 +170,12 @@ class DispatchAndRepositionEnv(Env):
         self.stop_time = [None] * len(self.taxis)
 
         self.hist_dist = [Queue(maxsize=int(self.env_params.additional_params['max_stop_time'] / self.sim_params.sim_step) + 1) for i in range(self.num_taxi)]
+        # Action mask: two dimension
+        # First dimension: Number of taxis + 1
+        # Second dimension: sum of number of actions on each dimension
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
 
-        # test for several functions    
+        # test for several functions
         if 'ENV_TEST' in os.environ and os.environ['ENV_TEST'] == '1':
             self._test()
 
@@ -275,6 +281,10 @@ class DispatchAndRepositionEnv(Env):
 
     def get_action_mask(self):
         mask = torch.zeros_like(self.action_mask[0])
+        num_edges = len(self.edges)
+        for i in (self.out_edges + self.in_edges):
+            mask[i] = True
+            mask[self.num_taxi + 1 + num_edges + i] = True
         if self.__need_reposition:
             taxi_id = self.taxis.index(self.__need_reposition)
             # print(self.action_mask[taxi_id].unsqueeze(0))
@@ -418,7 +428,7 @@ class DispatchAndRepositionEnv(Env):
         state = time_feature + edges_feature + taxi_feature + tl_feature + order_feature + mid_edge_feature + need_reposition_taxi_feature
         return np.array(state)
     
-    def _get_info(self):
+    def _get_infos(self):
         return {}
 
     def reset(self):
@@ -541,8 +551,10 @@ class DispatchAndRepositionEnv(Env):
                 self.__need_mid_edge = None
             else:
                 action_mask = self.get_action_mask()
-                print(action_mask[0, len(self.edges) + len(self.taxis) + 1 + 12], \
-                    action_mask[0, len(self.edges) + len(self.taxis) + 1 + 25])
+                print(action_mask[0, len(self.edges) + len(self.taxis) + 1 + 0], \
+                    action_mask[0, len(self.edges) + len(self.taxis) + 1 + 13], \
+                    action_mask[0, len(self.edges) + len(self.taxis) + 1 + 38], \
+                    action_mask[0, len(self.edges) + len(self.taxis) + 1 + 51])
 
         self._dispatch_taxi()
 
@@ -616,8 +628,9 @@ class DispatchAndRepositionEnv(Env):
 
         # collect the pickup vehicle density
         if 'pickup' not in self.statistics['route']:
-            self.statistics['route']['pickup'] = \
-                np.zeros((1 if 'mode-X' not in self.distribution else 3, n_edge))
+            self.statistics['route']['pickup'] = np.zeros((3, n_edge))
+#                np.zeros((1 if 'mode-X' not in self.distribution else 3, n_edge))
+
         cnt = self.statistics['route']['pickup']
         for taxi in pickup_taxi:
             edge = self.k.vehicle.get_edge(taxi)
@@ -628,8 +641,8 @@ class DispatchAndRepositionEnv(Env):
 
         # collect the on-service vehicle density
         if 'occupied' not in self.statistics['route']:
-            self.statistics['route']['occupied'] = \
-                np.zeros((1 if 'mode-X' not in self.distribution else 3, n_edge))
+            self.statistics['route']['occupied'] = np.zeros((3, n_edge))
+#                np.zeros((1 if 'mode-X' not in self.distribution else 3, n_edge))
         cnt = self.statistics['route']['occupied']
         for taxi in occupied_taxi:
             edge = self.k.vehicle.get_edge(taxi)
@@ -654,7 +667,7 @@ class DispatchAndRepositionEnv(Env):
             if not self.k.person.is_removed(person):
                 reward -= self.exist_penalty * timestep
 
-        # pickup price  
+        # pickup price
         for i, taxi in enumerate(self.taxis):
             if self.taxi_states[taxi]['empty'] and taxi in occupied_taxi and distances[i] > 0:
                 assert self.taxi_states[taxi]['pickup_distance'] is None
@@ -706,7 +719,7 @@ class DispatchAndRepositionEnv(Env):
                 # self.valid_distance += (distances[i] - self.taxi_states[taxi]['distance'])
                 self.total_taxi_distances[i] = (distances[i] - self.taxi_states[taxi]['distance'])
                 self.taxi_states[taxi]['distance'] = distances[i]
-        
+
             # check empty
             if taxi not in occupied_taxi and not self.taxi_states[taxi]['empty']:
                 self.taxi_states[taxi]['empty'] = True
@@ -720,7 +733,7 @@ class DispatchAndRepositionEnv(Env):
                 self.total_back_distances[i] = (background_distances[i] - self.background_states[veh]['distance'])
                 # self.total_distance += (background_distances[i] - self.background_states[veh]['distance'])
                 self.background_states[veh]['distance'] = background_distances[i]
-        
+
         self.total_distance = sum([self.taxi_states[taxi]['distance'] for taxi in self.taxis] + [self.background_states[veh]['distance'] for veh in self.background_cars])
         # co2 penalty
         # reward -= self.total_co2.sum() * 1e-3 * self.co2_penalty
@@ -913,7 +926,7 @@ class DispatchAndRepositionEnv(Env):
         if self.__need_mid_edge is not None:
             res = self.k.vehicle.reservation[self.__need_mid_edge]
             from_id, to_id = self.edges.index(res.fromEdge), self.edges.index(res.toEdge)
-            taxi_id =  self.taxis.index(self.__need_mid_edge)
+            taxi_id = self.taxis.index(self.__need_mid_edge)
             
             # mask from edge, to edge
             for i in range(self.n_mid_edge):
@@ -1017,7 +1030,8 @@ class DispatchAndRepositionEnv(Env):
         remain_pending_orders = []
 
         if 'pickup' not in self.statistics['location']:
-            self.statistics['location']['pickup'] = [[], [], []] if 'mode-X' in self.distribution else [[]]
+            #self.statistics['location']['pickup'] = [[], [], []] if 'mode-X' in self.distribution else [[]]
+            self.statistics['location']['pickup'] = [[], [], []]
         pickup_stat = self.statistics['location']['pickup']
         for res, veh_id in self.__pending_orders:
             # there would be some problems if the a taxi is on the road started with ":"

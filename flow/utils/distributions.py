@@ -236,6 +236,37 @@ def gen_request(env):
                 tp = 1
             per_id = 'per_' + str(idx)
             pos = np.random.uniform(20, env.inner_length - 20)
+    elif env.distribution == 'mode-6':
+        idx = env.k.person.total
+        rn, rn2, rn3 = np.random.rand(), np.random.rand(), np.random.rand()
+        if rn3 < 0.5:
+            edge_list = env.edges.copy()
+            edge_list.remove("top3_4_0")
+            edge_list.remove("bot3_4_0")
+            edge_list.remove("top0_0_0")
+            edge_list.remove("bot0_0_0")
+            edge_id1 = np.random.choice(edge_list)
+            edge_list.remove(edge_id1)
+            edge_id2 = np.random.choice(edge_list)
+            tp = 2
+        elif rn < 0.5:
+            edge_id1 = 'bot3_1_0'
+            edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+            tp = 0
+        else:
+            edge_id1 = 'top3_3_0'
+            edge_id2 = 'left1_0_0' if rn2 < 0.5 else 'top0_1_0'
+            tp = 1
+        per_id = 'per_' + str(idx)
+        pos = np.random.uniform(20, env.inner_length - 20)
+    elif env.distribution == 'mode-Y1':
+        idx = env.k.person.total
+        rn = np.random.rand()
+        edge_id1 = 'top3_3_0'
+        edge_id2 = 'left1_0_0' if rn < 0.5 else 'top0_1_0'
+
+        per_id = 'per_' + str(idx)
+        pos = np.random.uniform(20, env.inner_length - 20)
     else:
         raise NotImplementedError
     return per_id, edge_id1, edge_id2, pos, tp
