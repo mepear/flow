@@ -122,8 +122,8 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
             total_num_steps
             )
     if verbose: 
-        print('rewards/eval mean {:.2f} median {:.2f}'.format(\
-            np.mean(eval_episode_rewards), np.median(eval_episode_rewards)))
+        print('rewards/eval mean {:.2f} median {:.2f} std {:.2f}'.format(\
+            np.mean(eval_episode_rewards), np.median(eval_episode_rewards), np.std(eval_episode_rewards)))
     if writer and total_num_steps:
         writer.add_scalars(
                 "eval/order", 
@@ -136,8 +136,14 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
             total_num_steps
             )
     if verbose: 
-        print('eval/order mean {:.2f} median {:.2f}'.format(\
-            np.mean(nums_complete_orders), np.median(nums_complete_orders)))
+        print('eval/order mean {:.2f} median {:.2f} std {:.2f}'.format(\
+            np.mean(nums_complete_orders), np.median(nums_complete_orders), np.std(nums_complete_orders)))
+        print('eval/reward_per_order {:.2f} '.format(np.mean(eval_episode_rewards) / np.mean(nums_complete_orders)))
+        print('eva/reward_per_order (single) mean {:.2f} median {:.2f} std {:.2f}'.format(
+            (np.array(eval_episode_rewards) / np.array(nums_complete_orders)).mean(),
+            np.median(np.array(eval_episode_rewards) / np.array(nums_complete_orders)),
+            (np.array(eval_episode_rewards) / np.array(nums_complete_orders)).std()
+        ))
     if not np.alltrue(denom == 0):
         array = np.ma.masked_invalid(total_pickup_distances / denom)
         if writer and total_num_steps:
@@ -244,48 +250,58 @@ def get_corners(s, e, w):
     return [s + p, e + p, e - p, s - p]
 
 
-def plot(statistics, edge_position, key1, key2, name, n, m, idx, cmap, tp=None):
+def plot(statistics, edge_position, key1, key2, name, n, m, idx, cmap, tp=None, norm=False, vmin=None, vmax=None):
     ax = plt.subplot(n, m, idx)
     if tp is None:
         cnts = np.mean([sta[key1][key2] for sta in statistics], axis=0)
     else:
         cnts = np.mean([sta[key1][key2][tp] for sta in statistics], axis=0)
-    cnts /= cnts.max()
+    print(cnts.max())
+    if norm:
+        cnts /= cnts.max()
     colors = []
     patches = []
     x_min, x_max, y_min, y_max = 1e9, -1e9, 1e9, -1e9
     for cnt, (start, end, width) in zip(cnts, edge_position):
         vertices = get_corners(start, end, width)
-        assert cnt >= 0 and cnt <= 1, cnts
+        # assert cnt >= 0 and cnt <= 1, cnts
         poly = Polygon(vertices)
         colors.append(cnt)
         patches.append(poly)
         for vertex in vertices:
             x_min, y_min = min(x_min, vertex[0]), min(y_min, vertex[1])
             x_max, y_max = max(x_max, vertex[0]), max(y_max, vertex[1])
-    colors = np.array(colors) * 100
+    if norm:
+        colors = np.array(colors) * 100
+    else:
+        colors = np.array(colors)
     p = PatchCollection(patches)
     p.set_cmap(cmap)
     p.set_array(colors)
+    if not norm:
+        p.set_clim(vmin=vmin, vmax=vmax)
     ax.add_collection(p)
     plt.xlim(x_min - 5, x_max + 5)
     plt.ylim(y_min - 5, y_max + 5)
     plt.title(name)
     plt.xticks([]), plt.yticks([])
+    if not norm:
+        plt.colorbar(p)
 
 
-def draw(plotter, n_tp, cmap, ckpt, save_path):
+def draw(plotter, n_tp, cmap, ckpt, save_path, norm=True):
     # route and location
     ## background
     # plotter('route', 'background', 'background', 3, 2, 3, cmap)
     ## free
-    plotter('route', 'free', 'free', 2, n_tp + 1, n_tp + 1, cmap)
+    plotter = partial(plotter, norm=norm)
+    plotter('route', 'free', 'free', 2, n_tp + 1, n_tp + 1, cmap, vmin=0, vmax=30)
     ## reposition
-    plotter('location', 'reposition', 'reposition location', 2, n_tp + 1, 2 * n_tp + 2, cmap)
+    plotter('location', 'reposition', 'reposition location', 2, n_tp + 1, 2 * n_tp + 2, cmap, vmin=0, vmax=20)
 
     for i in range(n_tp):
-        plotter('route', 'pickup', 'pickup {}'.format(i), 2, n_tp + 1, i + 1, cmap, tp=i)
-        plotter('route', 'occupied', 'occupied {}'.format(i), 2, n_tp + 1, i + n_tp + 2, cmap, tp=i)
+        plotter('route', 'pickup', 'pickup {}'.format(i), 2, n_tp + 1, i + 1, cmap, tp=i, vmin=0, vmax=10)
+        plotter('route', 'occupied', 'occupied {}'.format(i), 2, n_tp + 1, i + n_tp + 2, cmap, tp=i, vmin=0, vmax=10)
     ## pickup0
     # plotter('route', 'pickup', 'pickup 0', 2, 2, 1, cmap, tp=0)
     ## pickup1
@@ -297,13 +313,13 @@ def draw(plotter, n_tp, cmap, ckpt, save_path):
 
     plt.suptitle('routes_and_locations from ckpt {}'.format(ckpt), y=0.00)
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.jpg'.format(ckpt)), \
+    plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.{}.jpg'.format(ckpt, norm)), \
         dpi=500, bbox_inches='tight')
 
 
 def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt):
     # fig, ax = plt.subplots()
-    cmap = plt.get_cmap('Greys')
+    # cmap = plt.get_cmap('YlGn')
     # mean_vels = np.mean(mean_velocities, axis=0)
     # for vel, (start, end, width) in zip(mean_vels, edge_position):
     #     vertices = get_corners(start, end, width)
@@ -318,9 +334,11 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     # plt.bar(np.arange(len(mean_vels)), np.sort(1 - mean_vels))
     # plt.ylim(0., 1.)
     # plt.savefig(os.path.join(save_path, 'distribution_{}.jpg'.format(ckpt)), dpi=500)
-
+    cmap1 = plt.get_cmap('Greys')
+    cmap2 = plt.get_cmap('YlGn')
     plotter = partial(plot, statistics, edge_position)
-    draw(plotter, 2, cmap, ckpt, save_path)
+    draw(plotter, 2, cmap1, ckpt, save_path, norm=True)
+    draw(plotter, 2, cmap2, ckpt, save_path, norm=False)
 
 
 def plot_emission(background_velocities, background_co2s, taxi_velocities, taxi_co2s, save_path, ckpt, total_distances, num_processes=100):

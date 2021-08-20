@@ -1204,11 +1204,11 @@ class TraCIVehicle(KernelVehicle):
     def get_taxi_fleet(self, flag):
         # return self.kernel_api.vehicle.getTaxiFleet(flag)
         if flag == 0:
-            return list(self.__free_taxis)
+            return sorted(list(self.__free_taxis))
         elif flag == 1:
-            return list(self.__pickup_taxis)
+            return sorted(list(self.__pickup_taxis))
         elif flag == 2:
-            return list(self.__occupied_taxis)
+            return sorted(list(self.__occupied_taxis))
 
     def get_max_speed(self, veh_id, error=-1001):
         """See parent class."""

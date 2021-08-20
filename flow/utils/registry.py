@@ -12,6 +12,7 @@ from flow.core.params import TrafficLightParams, PersonParams
 from flow.utils.runningstat import RunningStat
 
 import numpy as np
+import random
 from typing import List, Optional, Tuple, Union
 class Monitor(gym.Wrapper):
     """
@@ -316,6 +317,11 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
         sim_params = deepcopy(params['sim'])
         sim_params.port = port
         vehicles = deepcopy(params['veh'])
+
+        # print(sim_params.seed)
+        random.seed(sim_params.seed)
+        np.random.seed(sim_params.seed)
+
         # print(params['per'])
         persons = deepcopy(params.get('per', PersonParams()))
 

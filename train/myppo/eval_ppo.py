@@ -4,6 +4,7 @@ import os
 import sys
 import time
 from collections import deque
+import random
 
 import gym
 import numpy as np
@@ -25,6 +26,8 @@ def eval_ppo(flow_params=None):
 
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     if args.cuda and torch.cuda.is_available() and args.cuda_deterministic:
         torch.backends.cudnn.benchmark = False
@@ -48,7 +51,7 @@ def eval_ppo(flow_params=None):
     flow_params['sim'].render = not args.disable_render_during_eval
     flow_params['sim'].save_render = screenshot_path
     eval_envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
-        None, save_path, True, device=device, flow_params=flow_params, verbose=True)
+        None, save_path, True, device=device, flow_params=flow_params, verbose=args.verbose)
     evaluate(actor_critic, eval_envs, ob_rms, args.num_processes, device, save_path=save_path, \
         do_plot_congestion=args.plot_congestion, ckpt=args.eval_ckpt, verbose=True)
     eval_envs.close()

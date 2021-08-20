@@ -10,6 +10,8 @@ fi
 echo $config
 echo $experiment_name
 
+export OMP_NUM_THREADS=1 
+
 python train/train.py \
     $config \
     --experiment-name=$experiment_name \
