@@ -102,9 +102,9 @@ def make_vec_envs(env_name,
                     ]
                 else:
                     envs = []
-                    env_params = copy.deepcopy(flow_params)
-                    env_params['sim'].seed = seed
                     for i in range(num_processes):
+                        env_params = copy.deepcopy(flow_params)
+                        env_params['sim'].seed = seed + i
                         if port is not None:
                             envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
                                 port=port + i, popart_reward=popart_reward, gamma=gamma, \

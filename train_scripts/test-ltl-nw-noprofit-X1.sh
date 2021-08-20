@@ -1,6 +1,6 @@
 python train/train.py \
-    test-stl-nw-profit-X1-large \
-    --experiment-name=test-stl-nw-profit-X1-large \
+    test-ltl-nw-noprofit-X1 \
+    --experiment-name=test-ltl-nw-noprofit-X1 \
     --num-env-steps=1600000000 \
     --algo=ppo \
     --use-gae \

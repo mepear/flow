@@ -1,6 +1,20 @@
+config_path=$1
+config=`basename ${config_path%.*}`
+
+if  [ ! -n $2 ]; then
+    experiment_name=$2
+else
+    experiment_name=$config
+fi
+
+echo $config
+echo $experiment_name
+
+export OMP_NUM_THREADS=1 
+
 python train/train.py \
-    test-stl-nw-profit-X1-large \
-    --experiment-name=test-stl-nw-profit-X1-large \
+    $config \
+    --experiment-name=$experiment_name \
     --num-env-steps=1600000000 \
     --algo=ppo \
     --use-gae \
