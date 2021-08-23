@@ -23,10 +23,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
-from matplotlib.collections import PatchCollection
-
 from myppo.a2c_ppo_acktr.arguments import get_args
 from myppo.a2c_ppo_acktr.envs import make_vec_envs
 from myppo.a2c_ppo_acktr import utils
