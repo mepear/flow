@@ -35,6 +35,9 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     total_wait_times = []
     total_congestion_rates = []
     mean_velocities = []
+    reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
+                       'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
+                       'distance_reward': []}
     background_velocities = [[] for _ in range(eval_envs.num_envs)]
     background_co2s = [[] for _ in range(eval_envs.num_envs)]
     taxi_velocities = [[] for _ in range(eval_envs.num_envs)]
@@ -90,6 +93,13 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 eval_episode_rewards.append(info['episode']['r'])
                 nums_orders.append(info['episode']['num_orders'])
                 nums_complete_orders.append(info['episode']['num_complete_orders'])
+                reward_composition['wait_penalty'].append(info['episode']['reward_composition']['wait_penalty'])
+                reward_composition['exist_penalty'].append(info['episode']['reward_composition']['exist_penalty'])
+                reward_composition['pickup_reward'].append(info['episode']['reward_composition']['pickup_reward'])
+                reward_composition['miss_penalty'].append(info['episode']['reward_composition']['miss_penalty'])
+                reward_composition['time_reward'].append(info['episode']['reward_composition']['time_reward'])
+                reward_composition['distance_reward'].append(info['episode']['reward_composition']['distance_reward'])
+                reward_composition['tle_penalty'].append(info['episode']['reward_composition']['tle_penalty'])
                 total_pickup_distances.append(info['episode']['total_pickup_distance'])
                 total_pickup_times.append(info['episode']['total_pickup_time'])
                 total_valid_distances.append(info['episode']['total_valid_distance'])
@@ -241,6 +251,16 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
         # plot_co_emission(np.array(background_velocities), np.array(background_cos), np.array(taxi_velocities), np.array(taxi_cos), save_path, ckpt, num_processes=num_processes)
         plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, np.array(total_taxi_distances), num_processes=num_processes)
 
+    print("######")
+    pickup_reward = np.mean(reward_composition['pickup_reward'])
+    time_reward = np.mean(reward_composition['time_reward'])
+    distance_reward = np.mean(reward_composition['distance_reward'])
+    pickup_reward = round(pickup_reward, 6)
+    time_reward = round(time_reward, 6)
+    distance_reward = round(distance_reward, 6)
+    print(pickup_reward)
+    print(time_reward)
+    print(distance_reward)
 
 def get_corners(s, e, w):
     s, e = np.array(s), np.array(e)

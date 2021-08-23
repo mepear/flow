@@ -91,11 +91,11 @@ def plot_correlation(submodule, ckpt):
     eval_envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
         None, save_path, True, device=device, flow_params=flow_params, verbose=False, evaluate_id=ckpt)
     evaluate(actor_critic, eval_envs, args.num_processes, ob_rms, device, save_path=save_path, \
-        do_plot_congestion=args.plot_congestion, ckpt=ckpt, verbose=False)
+        ckpt=ckpt, verbose=False)
     eval_envs.close()
 
 def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=None, writer=None, \
-    total_num_steps=None, do_plot_congestion=False, ckpt=None, verbose=False):
+    total_num_steps=None, ckpt=None, verbose=False):
 
     vec_norm = utils.get_vec_normalize(eval_envs)
     if vec_norm is not None:
@@ -112,6 +112,9 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
     total_wait_times = []
     total_congestion_rates = []
     mean_velocities = []
+    reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
+                       'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
+                       'distance_reward': []}
     background_velocities = [[] for _ in range(eval_envs.num_envs)]
     background_co2s = [[] for _ in range(eval_envs.num_envs)]
     taxi_velocities = [[] for _ in range(eval_envs.num_envs)]
@@ -167,6 +170,13 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
             # total_back_distances[i].append(info['total_back_distance'])
             if 'episode' in info.keys():
                 eval_episode_rewards.append(info['episode']['r'])
+                reward_composition['wait_penalty'].append(info['episode']['reward_composition']['wait_penalty'])
+                reward_composition['exist_penalty'].append(info['episode']['reward_composition']['exist_penalty'])
+                reward_composition['pickup_reward'].append(info['episode']['reward_composition']['pickup_reward'])
+                reward_composition['miss_penalty'].append(info['episode']['reward_composition']['miss_penalty'])
+                reward_composition['time_reward'].append(info['episode']['reward_composition']['time_reward'])
+                reward_composition['distance_reward'].append(info['episode']['reward_composition']['distance_reward'])
+                reward_composition['tle_penalty'].append(info['episode']['reward_composition']['tle_penalty'])
                 nums_orders.append(info['episode']['num_orders'])
                 nums_complete_orders.append(info['episode']['num_complete_orders'])
                 total_pickup_distances.append(info['episode']['total_pickup_distance'])
@@ -313,19 +323,27 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
     name = edge_position['edge_name']
     tp = 1
 
-    df = pd.DataFrame({'reward': []})
-    for i in name:
-        df[i] = []
+    df = pd.DataFrame({'pickup_reward': [], 'time_reward': [], 'distance_reward': []})
+    # df = pd.DataFrame({'reward': []})
+    # for i in name:
+    #     df[i] = []
     df.to_csv("./data/plot_{}.csv".format(ckpt), index=False, sep=',')
+    pickup_reward = np.mean(reward_composition['pickup_reward'])
+    time_reward = np.mean(reward_composition['time_reward'])
+    distance_reward = np.mean(reward_composition['distance_reward'])
+    pickup_reward = round(pickup_reward, 6)
+    time_reward = round(time_reward, 6)
+    distance_reward = round(distance_reward, 6)
 
-    reward = np.mean(eval_episode_rewards)
-    reward = np.array([reward])
-
-    cnts = np.mean([sta['route']['free'] for sta in statistics], axis=0)
-    data = np.concatenate((reward, cnts))
-    print("########")
-    print(data)
-    print("########")
+    # reward = np.mean(eval_episode_rewards)
+    # reward = np.array([reward])
+    #
+    # cnts = np.mean([sta['route']['free'] for sta in statistics], axis=0)
+    # data = np.concatenate((reward, cnts))
+    # print("########")
+    # print(data)
+    # print("########")
+    data = [pickup_reward, time_reward, distance_reward]
     df = pd.read_csv('./data/plot_{}.csv'.format(ckpt))
     df.loc[1] = data
     df.to_csv("./data/plot_{}.csv".format(ckpt), index=False, sep=',')

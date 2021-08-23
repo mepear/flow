@@ -58,6 +58,9 @@ class Monitor(gym.Wrapper):
         self.info_keywords = info_keywords
         self.allow_early_resets = allow_early_resets
         self.rewards = None
+        self.reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
+                       'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
+                       'distance_reward': []}
         self.mean_velocities = []
         self.total_co2s = []
         self.congestion_rates = []
@@ -80,6 +83,9 @@ class Monitor(gym.Wrapper):
                 "wrap your env with Monitor(env, path, allow_early_resets=True)"
             )
         self.rewards = []
+        self.reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
+                       'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
+                       'distance_reward': []}
         self.mean_velocities = []
         self.total_co2s = []
         self.congestion_rates = []
@@ -107,6 +113,13 @@ class Monitor(gym.Wrapper):
             raise RuntimeError("Tried to step environment that needs reset")
         observation, reward, done, info = self.env.step(action)
         self.rewards.append(reward)
+        self.reward_composition['wait_penalty'].append(self.env.reward_info['wait_penalty'])
+        self.reward_composition['exist_penalty'].append(self.env.reward_info['exist_penalty'])
+        self.reward_composition['tle_penalty'].append(self.env.reward_info['tle_penalty'])
+        self.reward_composition['pickup_reward'].append(self.env.reward_info['pickup_reward'])
+        self.reward_composition['miss_penalty'].append(self.env.reward_info['miss_penalty'])
+        self.reward_composition['time_reward'].append(self.env.reward_info['time_reward'])
+        self.reward_composition['distance_reward'].append(self.env.reward_info['distance_reward'])
         self.mean_velocities.append(self.env.mean_velocity.copy())
         self.total_co2s.append(np.concatenate([self.env.background_co2, self.env.taxi_co2]))
         self.congestion_rates.append(self.env.congestion_rate)
@@ -133,6 +146,13 @@ class Monitor(gym.Wrapper):
             ep_info['total_co2s'] = self.total_co2s
             ep_info['edge_position'] = {'edge_position': self.env.edge_position, 'edge_name': self.env.edges}
             ep_info['statistics'] = self.env.statistics
+            ep_info['reward_composition'] = {'wait_penalty': sum(self.reward_composition['wait_penalty']),
+                        'exist_penalty': sum(self.reward_composition['exist_penalty']),
+                        'pickup_reward': sum(self.reward_composition['pickup_reward']),
+                        'miss_penalty': sum(self.reward_composition['miss_penalty']),
+                        'tle_penalty': sum(self.reward_composition['tle_penalty']),
+                        'time_reward': sum(self.reward_composition['time_reward']),
+                       'distance_reward': sum(self.reward_composition['distance_reward'])}
             ep_info.update(self.current_reset_info)
             if self.logger:
                 self.logger.writerow(ep_info)

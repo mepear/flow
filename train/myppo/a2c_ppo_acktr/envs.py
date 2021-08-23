@@ -90,11 +90,15 @@ def make_vec_envs(env_name,
                   popart_reward=False,
                   flow_params=None,
                   reward_scale=None,
-                  verbose=False):
-
+                  verbose=False,
+                  evaluate_id=None):
     while True:
         try:
-            with Lock(name='make_vec_envs'):
+            if evaluate_id is not None:
+                lock_name = 'make_vec_envs_' + str(evaluate_id)
+            else:
+                lock_name = 'make_vec_envs'
+            with Lock(name=lock_name):
                 if flow_params is None:
                     envs = [
                         make_env(env_name, seed, i, log_dir, allow_early_resets)
