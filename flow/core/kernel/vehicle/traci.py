@@ -145,7 +145,7 @@ class TraCIVehicle(KernelVehicle):
                 self.num_vehicles += 1
                 if typ['acceleration_controller'][0] == RLController:
                     self.num_rl_vehicles += 1
-                if typ['veh_id'] == 'taxi':
+                if 'taxi' in typ['veh_id']:
                     self.__free_taxis.add(veh_id)
 
     def update(self, reset):

@@ -16,12 +16,13 @@ from flow.networks.multi_ring import MultiRingNetwork
 from flow.networks.minicity import MiniCityNetwork
 from flow.networks.highway_ramps import HighwayRampsNetwork
 from flow.networks.i210_subnetwork import I210SubNetwork
-from flow.networks.grid_nxm import GridnxmNetwork, GridnxmNetworkInflow, GridnxmNetworkExpand
+from flow.networks.grid_nxm import GridnxmNetwork, GridnxmNetworkInflow, GridnxmNetworkExpand, GridnxmNetworkExpand_with_Index
 from flow.networks.grid_nxm_open import GridnxmNetworkOpen
 
 __all__ = [
     "Network", "BayBridgeNetwork", "BayBridgeTollNetwork",
     "BottleneckNetwork", "FigureEightNetwork", "TrafficLightGridNetwork",
     "HighwayNetwork", "RingNetwork", "MergeNetwork", "MultiRingNetwork",
-    "MiniCityNetwork", "HighwayRampsNetwork", "I210SubNetwork", "GridnxmNetworkOpen"
+    "MiniCityNetwork", "HighwayRampsNetwork", "I210SubNetwork", "GridnxmNetworkOpen",
+    "GridnxmNetworkExpand_with_Index",
 ]

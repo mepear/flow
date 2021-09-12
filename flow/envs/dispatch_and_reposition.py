@@ -1,4 +1,4 @@
-"""Environments for networks with traffic lights.
+"""Environments for networks with .
 
 These environments are used to train traffic lights to regulate traffic flow
 through an n x m traffic light grid.
@@ -43,7 +43,7 @@ ADDITIONAL_ENV_PARAMS = {
     "max_stop_time": 1, # in second, intentionally waiting time (deprecated)
     "stop_distance_eps": 1, # in meter, a threshold to determine whether the car is stopping (deprecated)
     "distribution": 'random', # random, mode-1, mode-2, mode-3
-    "reservation_order": 'random', # random or fifo 
+    "reservation_order": 'fifo', # random or fifo
     "n_mid_edge": 0, # number of mid point for an order
     "use_tl": False, # whether using traffic light info
     "max_detour": 1.5, # detour length / minimal length <= max_detour
@@ -101,7 +101,7 @@ class DispatchAndRepositionEnv(Env):
         self.congestion_rate = 0
 
         self.stop_distance_eps = env_params.additional_params['stop_distance_eps']
-        
+
         self.distribution = env_params.additional_params['distribution']
         self.distribution_random_ratio = env_params.additional_params.get('distribution_random_ratio', 0.5)
         # print(self.distribution)
@@ -134,9 +134,9 @@ class DispatchAndRepositionEnv(Env):
         self._preprocess()
 
         self.num_taxi = network.vehicles.num_rl_vehicles
-        self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi) == 'taxi']
+        self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi)[0: 4] == 'taxi']
         self.outside_taxis = []
-        self.background_cars = [car for car in network.vehicles.ids if network.vehicles.get_type(car) != 'taxi']
+        self.background_cars = [car for car in network.vehicles.ids if network.vehicles.get_type(car)[0: 4] != 'taxi']
         assert self.num_taxi == len(self.taxis)
         self.num_vehicles = network.vehicles.num_vehicles
 
@@ -177,6 +177,7 @@ class DispatchAndRepositionEnv(Env):
         self.reward_info = {'wait_penalty': 0, 'exist_penalty': 0, 'pickup_reward': 0,
                        'miss_penalty': 0, 'tle_penalty': 0, 'time_reward': 0,
                        'distance_reward': 0}
+        self.reservation_before_end = 0
 
         # test for several functions
         if 'ENV_TEST' in os.environ and os.environ['ENV_TEST'] == '1':
@@ -472,6 +473,7 @@ class DispatchAndRepositionEnv(Env):
         self.reward_info = {'wait_penalty': 0, 'exist_penalty': 0, 'pickup_reward': 0,
                        'miss_penalty': 0, 'tle_penalty': 0, 'time_reward': 0,
                        'distance_reward': 0}
+        self.reservation_before_end = 0
         return observation
 
     @property
@@ -511,9 +513,6 @@ class DispatchAndRepositionEnv(Env):
             if count == self.max_num_order:
                 break
         return np.array(orders).reshape(-1)
-
-    # def _apply_rl_actions(self, rl_actions):
-        # pass
 
     def _apply_rl_actions(self, rl_actions):
         """See class definition."""
@@ -1030,6 +1029,8 @@ class DispatchAndRepositionEnv(Env):
             return 
         per_id, edge_id1, edge_id2, pos, tp = gen_request(self)
         self.k.person.add_request(per_id, edge_id1, edge_id2, pos, tp=tp)
+        if(self.time_counter < 400):
+            self.reservation_before_end += 1
         if self.verbose:
             print('add request from', edge_id1, 'to', edge_id2, 'total', self.k.person.total)
 

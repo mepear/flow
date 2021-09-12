@@ -14,12 +14,14 @@ from flow.utils.runningstat import RunningStat
 import numpy as np
 import random
 from typing import List, Optional, Tuple, Union
+
+
 class Monitor(gym.Wrapper):
     """
     A monitor wrapper for Gym environments, it is used to know the episode reward, length, time and other data.
     :param env: The environment
     :param filename: the location to save a log file, can be None for no log
-    :param allow_early_resets: allows the reset of the environment before it is done
+    :param allow_early_resets: allows the reset of the enviro before it is done
     :param reset_keywords: extra keywords for the reset call,
         if extra parameters are needed at reset
     :param info_keywords: extra information to log, from the information return of env.step()
@@ -28,12 +30,12 @@ class Monitor(gym.Wrapper):
     EXT = "monitor.csv"
 
     def __init__(
-        self,
-        env: gym.Env,
-        filename: Optional[str] = None,
-        allow_early_resets: bool = True,
-        reset_keywords: Tuple[str, ...] = (),
-        info_keywords: Tuple[str, ...] = (),
+            self,
+            env: gym.Env,
+            filename: Optional[str] = None,
+            allow_early_resets: bool = True,
+            reset_keywords: Tuple[str, ...] = (),
+            info_keywords: Tuple[str, ...] = (),
     ):
         # if not hasattr(env, 'reward_range'):
         #     setattr(env, 'reward_range', (-float('inf'), float('inf')))
@@ -58,9 +60,7 @@ class Monitor(gym.Wrapper):
         self.info_keywords = info_keywords
         self.allow_early_resets = allow_early_resets
         self.rewards = None
-        self.reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
-                       'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
-                       'distance_reward': []}
+        self.reward_composition = {'pickup_reward': [], 'time_reward': [], 'distance_reward': []}
         self.mean_velocities = []
         self.total_co2s = []
         self.congestion_rates = []
@@ -83,9 +83,7 @@ class Monitor(gym.Wrapper):
                 "wrap your env with Monitor(env, path, allow_early_resets=True)"
             )
         self.rewards = []
-        self.reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
-                       'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
-                       'distance_reward': []}
+        self.reward_composition = {'pickup_reward': [], 'time_reward': [], 'distance_reward': []}
         self.mean_velocities = []
         self.total_co2s = []
         self.congestion_rates = []
@@ -101,6 +99,7 @@ class Monitor(gym.Wrapper):
                 observation = self.env.reset(**kwargs)
             except Exception as e:
                 print("reset error with {}, reset again".format(e))
+            # observation = self.env.reset(**kwargs)
         return observation
 
     def step(self, action: Union[np.ndarray, int]):
@@ -113,67 +112,63 @@ class Monitor(gym.Wrapper):
             raise RuntimeError("Tried to step environment that needs reset")
         observation, reward, done, info = self.env.step(action)
         self.rewards.append(reward)
-        self.reward_composition['wait_penalty'].append(self.env.reward_info['wait_penalty'])
-        self.reward_composition['exist_penalty'].append(self.env.reward_info['exist_penalty'])
-        self.reward_composition['tle_penalty'].append(self.env.reward_info['tle_penalty'])
-        self.reward_composition['pickup_reward'].append(self.env.reward_info['pickup_reward'])
-        self.reward_composition['miss_penalty'].append(self.env.reward_info['miss_penalty'])
-        self.reward_composition['time_reward'].append(self.env.reward_info['time_reward'])
-        self.reward_composition['distance_reward'].append(self.env.reward_info['distance_reward'])
-        self.mean_velocities.append(self.env.mean_velocity.copy())
-        self.total_co2s.append(np.concatenate([self.env.background_co2, self.env.taxi_co2]))
-        self.congestion_rates.append(self.env.congestion_rate)
+        # self.reward_composition['pickup_reward'].append(self.env.reward_info['pickup_reward'])
+        # self.reward_composition['time_reward'].append(self.env.reward_info['time_reward'])
+        # self.reward_composition['distance_reward'].append(self.env.reward_info['distance_reward'])
+        # self.mean_velocities.append(self.env.mean_velocity.copy())
+        # self.total_co2s.append(np.concatenate([self.env.background_co2, self.env.taxi_co2]))
+        # self.congestion_rates.append(self.env.congestion_rate)
         if done:
             self.needs_reset = True
-            ep_rew = sum(self.rewards)
             ep_len = len(self.rewards)
-            ep_info = {"r": round(ep_rew, 6), "l": ep_len, "t": round(time.time() - self.t_start, 6)}
-            for key in self.info_keywords:
-                ep_info[key] = info[key]
+            row_idx = self.env.row_idx
+            col_idx = self.env.col_idx
+            ep_rew = np.zeros(col_idx * row_idx)
+            for i in range(ep_len):
+                ep_rew += self.rewards[i]
+            ep_info = {"r": round(np.sum(ep_rew), 6), "l": ep_len, "t": round(time.time() - self.t_start, 6)}
+            # for key in self.info_keywords:
+            #     ep_info[key] = info[key]
             self.episode_rewards.append(ep_rew)
             self.episode_lengths.append(ep_len)
             self.episode_times.append(time.time() - self.t_start)
-            ep_info['num_orders'] = len(self.env.k.person.get_ids())
-            ep_info['num_waiting'] = len([idx for idx in self.k.person.get_ids() if not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
-            ep_info['reservation_before_end'] = self.reservation_before_end
-            ep_info['num_complete_orders'] = self.env.num_complete_orders
-            ep_info['total_pickup_distance'] = self.env.total_pickup_distance
-            ep_info['total_pickup_time'] = self.env.total_pickup_time
-            ep_info['total_valid_distance'] = self.env.total_valid_distance
-            ep_info['total_distance'] = self.env.total_distance
-            ep_info['total_valid_time'] = self.env.total_valid_time
-            ep_info['total_wait_time'] = self.env.total_wait_time
-            ep_info['congestion_rates'] = self.congestion_rates
-            ep_info['mean_velocities'] = self.mean_velocities
-            ep_info['total_co2s'] = self.total_co2s
-            ep_info['edge_position'] = {'edge_position': self.env.edge_position, 'edge_name': self.env.edges}
-            ep_info['statistics'] = self.env.statistics
-            ep_info['reward_composition'] = {'wait_penalty': sum(self.reward_composition['wait_penalty']),
-                        'exist_penalty': sum(self.reward_composition['exist_penalty']),
-                        'pickup_reward': sum(self.reward_composition['pickup_reward']),
-                        'miss_penalty': sum(self.reward_composition['miss_penalty']),
-                        'tle_penalty': sum(self.reward_composition['tle_penalty']),
-                        'time_reward': sum(self.reward_composition['time_reward']),
-                       'distance_reward': sum(self.reward_composition['distance_reward'])}
-            ep_info.update(self.current_reset_info)
-            if self.logger:
-                self.logger.writerow(ep_info)
-                self.file_handler.flush()
+            # ep_info['num_orders'] = len(self.env.k.person.get_ids())
+            # ep_info['num_waiting'] = len([idx for idx in self.k.person.get_ids() if
+            #                               not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
+            # ep_info['num_complete_orders'] = self.env.num_complete_orders
+            # ep_info['total_pickup_distance'] = self.env.total_pickup_distance
+            # ep_info['total_pickup_time'] = self.env.total_pickup_time
+            # ep_info['total_valid_distance'] = self.env.total_valid_distance
+            # ep_info['total_distance'] = self.env.total_distance
+            # ep_info['total_valid_time'] = self.env.total_valid_time
+            # ep_info['total_wait_time'] = self.env.total_wait_time
+            # ep_info['congestion_rates'] = self.congestion_rates
+            # ep_info['mean_velocities'] = self.mean_velocities
+            # ep_info['total_co2s'] = self.total_co2s
+            # ep_info['edge'] = {'edge_position': self.env.edge_position, 'edge_name': self.env.edges}
+            # ep_info['statistics'] = self.env.statistics
+            # ep_info['reward_composition'] = {'pickup_reward': sum(self.reward_composition['pickup_reward']),
+            #                                  'time_reward': sum(self.reward_composition['time_reward']),
+            #                                  'distance_reward': sum(self.reward_composition['distance_reward'])}
+            # ep_info.update(self.current_reset_info)
+            # if self.logger:
+            #     self.logger.writerow(ep_info)
+            #     self.file_handler.flush()
             info["episode"] = ep_info
         info['action_mask'] = self.env.get_action_mask()
         info['reward'] = reward
 
-        info['background_velocity'] = self.env.background_velocity.copy()
-        info['background_co2'] = self.env.background_co2.copy()
-        info['taxi_velocity'] = self.env.taxi_velocity.copy()
-        info['taxi_co2'] = self.env.taxi_co2.copy()
-        info['background_co'] = self.env.background_co.copy()
-        info['taxi_co'] = self.env.taxi_co.copy()
-        info['total_taxi_distance'] = self.env.total_taxi_distances
-        info['total_back_distance'] = self.env.total_back_distances
+        # info['background_velocity'] = self.env.background_velocity.copy()
+        # info['background_co2'] = self.env.background_co2.copy()
+        # info['taxi_velocity'] = self.env.taxi_velocity.copy()
+        # info['taxi_co2'] = self.env.taxi_co2.copy()
+        # info['background_co'] = self.env.background_co.copy()
+        # info['taxi_co'] = self.env.taxi_co.copy()
+        # info['total_taxi_distance'] = self.env.total_taxi_distances
+        # info['total_back_distance'] = self.env.total_back_distances
 
         self.total_steps += 1
-        return observation, reward, done, info
+        return observation, reward[0], done, info
 
     def close(self) -> None:
         """
@@ -210,15 +205,16 @@ class Monitor(gym.Wrapper):
         :return:
         """
         return self.episode_times
-    
+
+
 class RewardScaling(gym.Wrapper):
     def __init__(
-        self,
-        env: gym.Env,
-        popart_reward: bool,
-        gamma: int,
-        reward_scale=None,
-        clip=None
+            self,
+            env: gym.Env,
+            popart_reward: bool,
+            gamma: int,
+            reward_scale=None,
+            clip=None
     ):
         super().__init__(env=env)
         shape = ()
@@ -228,16 +224,16 @@ class RewardScaling(gym.Wrapper):
         self.rs = RunningStat(shape=shape)
         self.ret = np.zeros(shape)
         self.clip = clip
-    
+
     def reset(self, **kwargs):
         self.ret = np.zeros_like(self.ret)
         return self.env.reset(**kwargs)
-    
+
     def step(self, action):
         observation, reward, done, info = self.env.step(action)
 
         scaled_reward = reward / self.reward_scale if self.reward_scale else reward
-        
+
         if self.popart_reward:
             self.ret = self.ret * self.gamma + scaled_reward
             self.rs.push(self.ret)
@@ -245,13 +241,13 @@ class RewardScaling(gym.Wrapper):
         if self.clip:
             scaled_reward = np.clip(scaled_reward, -self.clip, self.clip)
         return observation, scaled_reward, done, info
-    
+
     def close(self):
         super().close()
 
 
 def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0.99, reward_scale=None, \
-    port=None, verbose=False, save_path=None):
+                    port=None, verbose=False, save_path=None):
     """Create a parametrized flow environment compatible with OpenAI gym.
 
     This environment creation method allows for the specification of several
@@ -347,7 +343,6 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
         # print(params['per'])
         persons = deepcopy(params.get('per', PersonParams()))
 
-
         network = network_class(
             name=exp_tag,
             vehicles=vehicles,
@@ -388,7 +383,7 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
                 "simulator": params['simulator']
             })
 
-        env =  Monitor( gym.envs.make(env_name) )
+        env = Monitor(gym.envs.make(env_name))
         env = RewardScaling(env, popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale)
         return env
 
@@ -396,8 +391,8 @@ def make_create_env(params, version=0, render=None, popart_reward=False, gamma=0
 
 
 def env_constructor(params, version=0, render=None, port=None, verbose=False, popart_reward=False, \
-    gamma=0.99, reward_scale=None, save_path=None):
+                    gamma=0.99, reward_scale=None, save_path=None):
     """Return a constructor from make_create_env."""
     create_env, env_name = make_create_env(params, version, render, popart_reward, gamma, \
-        reward_scale, port, verbose, save_path)
+                                           reward_scale, port, verbose, save_path)
     return create_env

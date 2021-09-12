@@ -522,3 +522,66 @@ class FluxBase_Router(BaseRouter):
             next_route = None
 
         return next_route
+
+class IndexEnv_Router(BaseRouter):
+    """
+    A router used to continuously routes inner background vehicles to in OpenFlow Network.
+
+    This class allows the vehicle to pick a random route at junctions. However, they shouldn't enter any exit path.
+    These vehicles can't be created on exit path.
+
+    Usage
+    -----
+    See base class for usage example.
+    """
+
+    def choose_route(self, env):
+        """See parent class."""
+        edges =[]
+        for idx in range(env.col_idx * env.cols):
+            col = idx % env.cols
+            ind = idx // env.cols
+            edges.append("out_left{}_{}".format(col, ind))
+            edges.append("out_right{}_{}".format(col, (env.row_idx - 1) * env.col_idx + ind))
+            edges.append("in_right{}_{}".format(col, ind))
+            edges.append("in_left{}_{}".format(col, (env.row_idx - 1) * env.col_idx + ind))
+        for idx in range(env.rows * env.row_idx):
+            row = idx % env.rows
+            ind = idx // env.rows
+            edges.append("out_top{}_{}".format(row, ind * env.col_idx))
+            edges.append("out_bot{}_{}".format(row, ind * env.col_idx + env.col_idx - 1))
+            edges.append("in_bot{}_{}".format(row, ind * env.col_idx))
+            edges.append("in_top{}_{}".format(row, ind * env.col_idx + env.col_idx - 1))
+
+        vehicles = env.k.vehicle
+        veh_id = self.veh_id
+        veh_edge = vehicles.get_edge(veh_id)
+        veh_route = vehicles.get_route(veh_id)
+        veh_next_edge = env.k.network.next_edge(veh_edge,
+                                                vehicles.get_lane(veh_id))
+        not_an_edge = ":"
+        no_next = 0
+
+        if len(veh_next_edge) == no_next:
+            next_route = None
+        elif veh_route[-1] == veh_edge and veh_next_edge != []:
+            flag = True
+            while(flag):
+                veh_next_edge = env.k.network.next_edge(veh_edge, vehicles.get_lane(veh_id))
+                random_route = random.randint(0, len(veh_next_edge) - 1)
+                try:
+                    while veh_next_edge[0][0][0] == not_an_edge:
+                        veh_next_edge = env.k.network.next_edge(
+                            veh_next_edge[random_route][0],
+                            veh_next_edge[random_route][1])
+                except:
+                    print('veh_id', veh_id, 'veh_edge', veh_edge, 'veh_route', veh_route, 'veh_next_edge', veh_next_edge)
+                    raise KeyError
+                next_route = [veh_edge, veh_next_edge[0][0]]
+                #print(veh_next_edge[0][0])
+                if (veh_next_edge[0][0] not in edges):
+                    flag = False
+        else:
+            next_route = None
+
+        return next_route

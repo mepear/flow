@@ -28,7 +28,7 @@ from flow.controllers.lane_change_controllers import StaticLaneChanger, \
 # routing controllers
 from flow.controllers.base_routing_controller import BaseRouter
 from flow.controllers.routing_controllers import ContinuousRouter, \
-    GridRouter, BayBridgeRouter, I210Router, MinicityRouter, OpenRouter_Flow, OpenRouter_Inner, Flow_Select, FlowRouter_Inner, \
+    GridRouter, BayBridgeRouter, I210Router, MinicityRouter, OpenRouter_Flow, OpenRouter_Inner, Flow_Select, FlowRouter_Inner, IndexEnv_Router, \
     FluxBase_Router
 
 __all__ = [
@@ -39,5 +39,5 @@ __all__ = [
     "ContinuousRouter", "GridRouter", "BayBridgeRouter", "LACController",
     "GippsController", "NonLocalFollowerStopper", "BandoFTLController",
     "I210Router", "OpenRouter_Flow", "OpenRouter_Inner", "Flow_Select", "FlowRouter_Inner",
-    "FluxBase_Router"
+    "FluxBase_Router", "IndexEnv_Router"
 ]

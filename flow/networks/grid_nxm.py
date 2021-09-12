@@ -982,3 +982,465 @@ class GridnxmNetworkExpand(GridnxmNetwork):
             con_dict[node_id] += conn
 
         return con_dict
+
+class GridnxmNetworkExpand_with_Index(Network):
+    """Traffic Light Grid network class.
+
+    The traffic light grid network consists of m vertical lanes and n
+    horizontal lanes, with a total of nxm intersections where the vertical
+    and horizontal edges meet.
+
+    Requires from net_params:
+
+    * **grid_array** : dictionary of grid array data, with the following keys
+
+      * **row_num** : number of horizontal rows of edges
+      * **col_num** : number of vertical columns of edges
+      * **inner_length** : length of inner edges in traffic light grid network
+
+    * **horizontal_lanes** : number of lanes in the horizontal edges
+    * **vertical_lanes** : number of lanes in the vertical edges
+    * **speed_limit** : speed limit for all edges. This may be represented as a
+      float value, or a dictionary with separate values for vertical and
+      horizontal lanes.
+    """
+
+    def __init__(self,
+                 name,
+                 vehicles,
+                 net_params,
+                 persons=PersonParams(),
+                 initial_config=InitialConfig(),
+                 traffic_lights=TrafficLightParams()):
+        """Initialize an n*m traffic light grid network."""
+        optional = ["tl_logic", "outer_length"]
+        for p in ADDITIONAL_NET_PARAMS.keys():
+            if p not in net_params.additional_params and p not in optional:
+                raise KeyError('Network parameter "{}" not supplied'.format(p))
+
+        for p in ADDITIONAL_NET_PARAMS["grid_array"].keys():
+            if p not in net_params.additional_params["grid_array"] and p not in optional:
+                raise KeyError(
+                    'Grid array parameter "{}" not supplied'.format(p))
+
+        # retrieve all additional parameters
+        # refer to the ADDITIONAL_NET_PARAMS dict for more documentation
+        self.vertical_lanes = net_params.additional_params["vertical_lanes"]
+        self.horizontal_lanes = net_params.additional_params[
+            "horizontal_lanes"]
+        self.speed_limit = net_params.additional_params["speed_limit"]
+        if not isinstance(self.speed_limit, dict):
+            self.speed_limit = {
+                "horizontal": self.speed_limit,
+                "vertical": self.speed_limit
+            }
+
+        self.grid_array = net_params.additional_params["grid_array"]
+        self.row_num = self.grid_array["row_num"]
+        self.col_num = self.grid_array["col_num"]
+        self.row_idx_num = self.grid_array["row_idx"]
+        self.col_idx_num = self.grid_array["col_idx"]
+        self.inner_length = self.grid_array["inner_length"]
+        self.outer_length = self.grid_array.get("outer_length", None)
+        assert self.outer_length == self.inner_length // 2
+        self.sub_edge_num = self.grid_array.get("sub_edge_num", 1)
+
+        # specifies whether or not there will be traffic lights at the
+        # intersections (False by default)
+        self.use_traffic_lights = net_params.additional_params.get(
+            "traffic_lights", False)
+
+        # radius of the inner nodes (ie of the intersections)
+        # self.inner_nodes_radius = 2.9 + 3.3 * max(self.vertical_lanes,
+        #                                           self.horizontal_lanes)
+        self.inner_nodes_radius = 0
+
+        # total number of edges in the network
+        self.num_edges = self.col_idx_num * self.row_idx_num * (2 * self.col_num * self.row_num + self.col_num + self.row_num)
+
+        # name of the network (DO NOT CHANGE)
+        self.name = "BobLoblawsLawBlog"
+
+        super().__init__(name, vehicles, net_params, persons, initial_config,
+                         traffic_lights)
+
+    def specify_nodes(self, net_params):
+
+        """Build out the inner nodes of the network.
+
+        The inner nodes correspond to the intersections between the roads. They
+        are numbered from bottom left, increasing first across the columns and
+        then across the rows.
+
+        For example, the nodes in a traffic light grid with 2 rows and 3 columns
+        would be indexed as follows:
+
+            |     |     |
+        --- 3 --- 4 --- 5 ---
+            |     |     |
+        --- 0 --- 1 --- 2 ---
+            |     |     |
+
+        The id of a node is then "center{index}", for instance "center0" for
+        node 0, "center1" for node 1 etc.
+
+        Returns
+        -------
+        list <dict>
+            List of inner nodes
+        """
+        node_type = "traffic_light" if self.use_traffic_lights else "priority"
+
+        nodes = []
+        for row in range(self.row_num):
+            for col in range(self.col_num):
+                for row_idx in range(self.row_idx_num):
+                    for col_idx in range(self.col_idx_num):
+                        nodes.append({
+                            "id": "center{}_{}".format(row * self.col_num + col, row_idx * self.col_idx_num + col_idx),
+                            "x": col * self.inner_length + col_idx * self.col_num * self.inner_length,
+                            "y": row * self.inner_length + row_idx * self.row_num * self.inner_length,
+                            "type": node_type,
+                            # "radius": self.inner_nodes_radius
+                        })
+
+        inserted_nodes = []
+
+        for col in range(self.col_num * self.col_idx_num):
+            for row_idx in range(self.row_idx_num + 1):
+                inserted_nodes.append({
+                    "id": "row_{}_{}_left".format(col, row_idx),
+                    "x": col * self.inner_length,
+                    "y": row_idx * self.row_num * self.inner_length - self.outer_length,
+                    "type": "priority",
+                })
+                inserted_nodes.append({
+                    "id": "row_{}_{}_right".format(col, row_idx),
+                    "x": col * self.inner_length,
+                    "y": row_idx * self.row_num * self.inner_length - self.outer_length,
+                    "type": "priority",
+                })
+
+        for row in range(self.row_num * self.row_idx_num):
+            for col_idx in range(self.col_idx_num + 1):
+                inserted_nodes.append({
+                    "id": "col_{}_{}_bot".format(row, col_idx),
+                    "x": col_idx * self.col_num * self.inner_length - self.outer_length,
+                    "y": row * self.inner_length,
+                    "type": "priority",
+                })
+                inserted_nodes.append({
+                    "id": "col_{}_{}_top".format(row, col_idx),
+                    "x": col_idx * self.col_num * self.inner_length - self.outer_length,
+                    "y": row * self.inner_length,
+                    "type": "priority",
+                })
+
+        return nodes + inserted_nodes
+
+    def specify_edges(self, net_params):
+        """Build out the inner edges of the network.
+
+        The inner edges are the edges joining the inner nodes to each other.
+
+        Consider the following network with n = 2 rows and m = 3 columns,
+        where the rows are indexed from 0 to 1 and the columns from 0 to 2, and
+        the inner nodes are marked by 'x':
+
+                |     |     |
+        (1) ----x-----x-----x----
+                |     |     |
+        (0) ----x-----x-(*)-x----
+                |     |     |
+               (0)   (1)   (2)
+
+        There are n * (m - 1) = 4 horizontal inner edges and (n - 1) * m = 3
+        vertical inner edges, all that multiplied by two because each edge
+        consists of two roads going in opposite directions traffic-wise.
+
+        On an horizontal edge, the id of the top road is "top{i}_{j}" and the
+        id of the bottom road is "bot{i}_{j}", where i is the index of the row
+        where the edge is and j is the index of the column to the right of it.
+
+        On a vertical edge, the id of the right road is "right{i}_{j}" and the
+        id of the left road is "left{i}_{j}", where i is the index of the row
+        above the edge and j is the index of the column where the edge is.
+
+        For example, on edge (*) on row (0): the id of the bottom road (traffic
+        going from left to right) is "bot0_2" and the id of the top road
+        (traffic going from right to left) is "top0_2".
+
+        Returns
+        -------
+        list <dict>
+            List of inner edges
+        """
+        edges = []
+
+        def new_edge(index, from_node, to_node, orientation, lane, area_index):
+            assert from_node != to_node
+            node_list = ["center{}_{}".format(from_node, area_index)] + ["center{}_{}".format(to_node, area_index)]
+
+            new_edges = []
+            new_edges.append({
+                "id": "{}{}_{}".format(lane, index, area_index),
+                "type": orientation,
+                "priority": 78,
+                "from": node_list[0],
+                "to": node_list[1],
+                "length": self.inner_length
+            })
+            return new_edges
+
+        # Build the horizontal inner edges
+        for i in range(self.row_num):
+            for j in range(self.col_num - 1):
+                for row_idx in range(self.row_idx_num):
+                    for col_idx in range(self.col_idx_num):
+                        area_idx = row_idx * self.col_idx_num + col_idx
+                        node_index = i * self.col_num + j
+                        index = "{}_{}".format(i, j + 1)
+                        edges += new_edge(index, node_index + 1, node_index,
+                                          "horizontal", "top", area_idx)
+                        edges += new_edge(index, node_index, node_index + 1,
+                                          "horizontal", "bot", area_idx)
+
+        # Build the vertical inner edges
+        for i in range(self.row_num - 1):
+            for j in range(self.col_num):
+                for row_idx in range(self.row_idx_num):
+                    for col_idx in range(self.col_idx_num):
+                        area_idx = row_idx * self.col_idx_num + col_idx
+                        node_index = i * self.col_num + j
+                        index = "{}_{}".format(i + 1, j)
+                        edges += new_edge(index, node_index, node_index + self.col_num,
+                                          "vertical", "right", area_idx)
+                        edges += new_edge(index, node_index + self.col_num, node_index,
+                                          "vertical", "left", area_idx)
+
+        # Build vertical and horizontal flow edges
+        for row_idx in range(self.row_idx_num):
+            for col_idx in range(self.col_idx_num):
+                for col in range(self.col_num):
+                    col_true = col + col_idx * self.col_num
+                    area_idx = row_idx * self.col_idx_num + col_idx
+                    edges += [{
+                        "id": "in_left{}_{}".format(col, area_idx),
+                        "type": "vertical",
+                        "priority": 78,
+                        "from": "row_{}_{}_left".format(col_true, row_idx + 1),
+                        "to": "center{}_{}".format((self.row_num - 1) * self.col_num + col, area_idx),
+                        "length": self.outer_length
+                    }]
+                    edges += [{
+                        "id": "out_right{}_{}".format(col, area_idx),
+                        "type": "vertical",
+                        "priority": 78,
+                        "from": "center{}_{}".format((self.row_num - 1) * self.col_num + col, area_idx),
+                        "to": "row_{}_{}_right".format(col_true, row_idx + 1),
+                        "length": self.outer_length
+                    }]
+                    edges += [{
+                        "id": "in_right{}_{}".format(col, area_idx),
+                        "type": "vertical",
+                        "priority": 78,
+                        "from": "row_{}_{}_right".format(col_true, row_idx),
+                        "to": "center{}_{}".format(col, area_idx),
+                        "length": self.outer_length
+                    }]
+                    edges += [{
+                        "id": "out_left{}_{}".format(col, area_idx),
+                        "type": "vertical",
+                        "priority": 78,
+                        "from": "center{}_{}".format(col, area_idx),
+                        "to": "row_{}_{}_left".format(col_true, row_idx),
+                        "length": self.outer_length
+                    }]
+                for row in range(self.row_num):
+                    row_true = row + row_idx * self.row_num
+                    area_idx = row_idx * self.col_idx_num + col_idx
+                    edges += [{
+                        "id": "in_top{}_{}".format(row, area_idx),
+                        "type": "horizontal",
+                        "priority": 78,
+                        "from": "col_{}_{}_top".format(row_true, col_idx + 1),
+                        "to": "center{}_{}".format(row * self.col_num + self.col_num - 1, area_idx),
+                        "length": self.outer_length
+                    }]
+                    edges += [{
+                        "id": "out_bot{}_{}".format(row, area_idx),
+                        "type": "horizontal",
+                        "priority": 78,
+                        "from": "center{}_{}".format(row * self.col_num + self.col_num - 1, area_idx),
+                        "to": "col_{}_{}_bot".format(row_true, col_idx + 1),
+                        "length": self.outer_length
+                    }]
+                    edges += [{
+                        "id": "in_bot{}_{}".format(row, area_idx),
+                        "type": "horizontal",
+                        "priority": 78,
+                        "from": "col_{}_{}_bot".format(row_true, col_idx),
+                        "to": "center{}_{}".format(row * self.col_num, area_idx),
+                        "length": self.outer_length
+                    }]
+                    edges += [{
+                        "id": "out_top{}_{}".format(row, area_idx),
+                        "type": "horizontal",
+                        "priority": 78,
+                        "from": "center{}_{}".format(row * self.col_num, area_idx),
+                        "to": "col_{}_{}_top".format(row_true, col_idx),
+                        "length": self.outer_length
+                    }]
+
+        return edges
+
+    def specify_routes(self, net_params):
+        """See parent class."""
+        routes = {}
+
+        edges = self.specify_edges(net_params)
+        for edge in edges:
+            routes[edge['id']] = [edge['id']]
+        return routes
+
+    def specify_types(self, net_params):
+        """See parent class."""
+        types = [{
+            "id": "horizontal",
+            "numLanes": self.horizontal_lanes,
+            "speed": self.speed_limit["horizontal"]
+        }, {
+            "id": "vertical",
+            "numLanes": self.vertical_lanes,
+            "speed": self.speed_limit["vertical"]
+        }]
+
+        return types
+
+    # ===============================
+    # ============ UTILS ============
+    # ===============================
+
+    def specify_connections(self, net_params):
+        """Build out connections at each inner node.
+        """
+        con_dict = {}
+
+        # specify certain connections for given edge pair
+        # In form of {"from" : edge id,
+        #             "to" : edge id, \
+        #             "fromLane":(sub-edge of a certain edge and it is by default 0) : {number between 0 to self.lanes - 1},
+        #             "toLane":{number between 0 to self.lanes - 1}}
+
+        def new_con(from_id, to_id):
+
+            conn = []
+
+            for lane1 in range(self.vertical_lanes):
+                for lane2 in range(self.vertical_lanes):
+                    conn.append({
+                        "from": from_id,
+                        "to": to_id,
+                        "fromLane": str(lane1),
+                        "toLane": str(lane2),
+                    })
+            return conn
+
+        # build connections at each inner node
+
+        for area_idx in range(self.col_idx_num * self.row_idx_num):
+            for node_id in range(self.row_num * self.col_num):
+                conn = []
+                i = node_id // self.col_num
+                j = node_id % self.col_num
+                if i + 1 < self.row_num:
+                    top_edge_id = ["right{}_{}_{}".format(i + 1, j, area_idx), "left{}_{}_{}".format(i + 1, j, area_idx)]
+                else:
+                    top_edge_id = ["out_right{}_{}".format(j, area_idx), "in_left{}_{}".format(j, area_idx)]
+                if i > 0:
+                    bot_edge_id = ["left{}_{}_{}".format(i, j, area_idx), "right{}_{}_{}".format(i, j, area_idx)]
+                else:
+                    bot_edge_id = ["out_left{}_{}".format(j, area_idx), "in_right{}_{}".format(j, area_idx)]
+                if j > 0:
+                    left_edge_id = ["top{}_{}_{}".format(i, j, area_idx), "bot{}_{}_{}".format(i, j, area_idx)]
+                else:
+                    left_edge_id = ["out_top{}_{}".format(i, area_idx), "in_bot{}_{}".format(i, area_idx)]
+                if j + 1 < self.col_num:
+                    right_edge_id = ["bot{}_{}_{}".format(i, j + 1, area_idx), "top{}_{}_{}".format(i, j + 1, area_idx)]
+                else:
+                    right_edge_id = ["out_bot{}_{}".format(i, area_idx), "in_top{}_{}".format(i, area_idx)]
+                assert self.vertical_lanes == self.horizontal_lanes
+                for i in [top_edge_id, bot_edge_id, left_edge_id, right_edge_id]:
+                    for j in [top_edge_id, bot_edge_id, left_edge_id, right_edge_id]:
+                        conn += new_con(i[1], j[0])
+                node_name = "center{}_{}".format(node_id, area_idx)
+                con_dict[node_name] = conn
+
+        for row in range(self.row_num * self.row_idx_num):
+            for col in range(1, self.col_idx_num):
+                i = row % self.row_num
+                j = row // self.row_num
+                conn = []
+                node_name = "col_{}_{}_top".format(row, col)
+                conn += new_con("out_top{}_{}".format(i, j * self.col_idx_num + col), "in_top{}_{}".format(i, j * self.col_idx_num + col - 1))
+                con_dict[node_name] = conn
+
+                conn = []
+                node_name = "col_{}_{}_bot".format(row, col)
+                conn += new_con("out_bot{}_{}".format(i, j * self.col_idx_num + col - 1), "in_bot{}_{}".format(i, j * self.col_idx_num + col))
+                con_dict[node_name] = conn
+
+        for col in range(self.col_num * self.col_idx_num):
+            for row in range(1, self.row_idx_num):
+                i = col % self.col_num
+                j = col // self.col_num
+                conn = []
+                node_name = "row_{}_{}_left".format(col, row)
+                conn += new_con("out_left{}_{}".format(i, row * self.col_idx_num + j), "in_left{}_{}".format(i, row * self.col_idx_num + j - self.col_idx_num))
+                con_dict[node_name] = conn
+
+                conn = []
+                node_name = "row_{}_{}_right".format(col, row)
+                conn += new_con("out_right{}_{}".format(i, row * self.col_idx_num + j - self.col_idx_num), "in_right{}_{}".format(i, row * self.col_idx_num + j))
+                con_dict[node_name] = conn
+
+        return con_dict
+
+    # TODO necessary?
+    def specify_edge_starts(self):
+        """See parent class."""
+        length = 0
+        edgestarts = []
+        for edge in self.edges:
+            # the current edge starts where the last edge ended
+            edgestarts.append((edge['id'], length))
+            # increment the total length of the network with the length of the
+            # current edge
+            length += float(edge['length'])
+
+        return edgestarts
+
+    @property
+    def node_mapping(self):
+        """Map nodes to edges.
+
+        Returns a list of pairs (node, connected edges) of all inner nodes
+        Returns a list of pairs (node, connected edges) of all inner nodes
+        and for each of them, the 4 edges that leave this node.
+
+        The nodes are listed in alphabetical order, and within that, edges are
+        listed in order: [bot, right, top, left].
+        """
+        mapping = {}
+        for area_idx in range(self.col_idx_num * self.row_idx_num):
+            for node_id in range(self.row_num * self.col_num):
+                node_name = "center{}_{}".format(node_id, area_idx)
+                i = node_id // self.col_num
+                j = node_id % self.col_num
+                top_edge_id = "left{}_{}_{}".format(i + 1, j, area_idx) if i + 1 < self.row_num else None
+                bot_edge_id = "right{}_{}_{}".format(i, j, area_idx) if i > 0 else None
+                left_edge_id = "bot{}_{}_{}".format(i, j, area_idx) if j > 0 else None
+                right_edge_id = "top{}_{}_{}".format(i, j + 1, area_idx) if j + 1 < self.col_num else None
+                mapping[node_name] = [left_edge_id, bot_edge_id, right_edge_id, top_edge_id]
+
+        return sorted(mapping.items(), key=lambda x: x[0])
