@@ -28,6 +28,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     eval_episode_rewards = []
     nums_orders = []
     nums_complete_orders = []
+    reservation_before_end = []
     total_pickup_distances = []
     total_pickup_times = []
     total_valid_distances = []
@@ -93,6 +94,7 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 eval_episode_rewards.append(info['episode']['r'])
                 nums_orders.append(info['episode']['num_orders'])
                 nums_complete_orders.append(info['episode']['num_complete_orders'])
+                reservation_before_end.append(info['episode']['reservation_before_end'])
                 reward_composition['wait_penalty'].append(info['episode']['reward_composition']['wait_penalty'])
                 reward_composition['exist_penalty'].append(info['episode']['reward_composition']['exist_penalty'])
                 reward_composition['pickup_reward'].append(info['episode']['reward_composition']['pickup_reward'])
@@ -245,22 +247,20 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     if verbose: 
         print('eval/congestion_rate mean {:.2f} median {:.2f}'.format(\
             np.mean(total_congestion_rates), np.median(total_congestion_rates)))
-    
-    if do_plot_congestion:
-        plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
-        # plot_co_emission(np.array(background_velocities), np.array(background_cos), np.array(taxi_velocities), np.array(taxi_cos), save_path, ckpt, num_processes=num_processes)
-        plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, np.array(total_taxi_distances), num_processes=num_processes)
+    if verbose:
+        print('eval/pickup_reward mean {:.2f} median {:.2f}'.format(\
+            np.mean(reward_composition['pickup_reward']), np.median(reward_composition['pickup_reward'])))
+        print('eval/time_reward mean {:.2f} median {:.2f}'.format(\
+            np.mean(reward_composition['time_reward']), np.median(reward_composition['time_reward'])))
+        print('eval/distance_reward mean {:.2f} median {:.2f}'.format(\
+            np.mean(reward_composition['distance_reward']), np.median(reward_composition['distance_reward'])))
+        print('eval/reservation_before_end mean {:.2f} median {:.2f}'.format(\
+            np.mean(reservation_before_end), np.median(reservation_before_end)))
 
-    print("######")
-    pickup_reward = np.mean(reward_composition['pickup_reward'])
-    time_reward = np.mean(reward_composition['time_reward'])
-    distance_reward = np.mean(reward_composition['distance_reward'])
-    pickup_reward = round(pickup_reward, 6)
-    time_reward = round(time_reward, 6)
-    distance_reward = round(distance_reward, 6)
-    print(pickup_reward)
-    print(time_reward)
-    print(distance_reward)
+    if do_plot_congestion:
+        plot_congestion(mean_velocities, edge_position['edge_position'], statistics, save_path, ckpt)
+        # plot_co_emission(np.array(background_velocities), np.array(background_cos), np.array(taxi_velocities), np.array(taxi_cos), save_path, ckpt, num_processes=num_processes)
+        # plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, np.array(total_taxi_distances), num_processes=num_processes)
 
 def get_corners(s, e, w):
     s, e = np.array(s), np.array(e)
@@ -357,7 +357,7 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     cmap1 = plt.get_cmap('Greys')
     cmap2 = plt.get_cmap('YlGn')
     plotter = partial(plot, statistics, edge_position)
-    draw(plotter, 2, cmap1, ckpt, save_path, norm=True)
+    # draw(plotter, 2, cmap1, ckpt, save_path, norm=True)
     draw(plotter, 2, cmap2, ckpt, save_path, norm=False)
 
 
