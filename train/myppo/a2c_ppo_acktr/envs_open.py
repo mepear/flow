@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from gym.spaces.box import Box
 
-from flow.utils.registry import env_constructor
+from flow.utils.registry_open import env_constructor
 
 from baselines import bench
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
@@ -111,19 +111,20 @@ def make_vec_envs(env_name,
                         env_params['sim'].seed = seed + i
                         if port is not None:
                             envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
-                                port=port + i, popart_reward=popart_reward, gamma=gamma, \
-                                reward_scale=reward_scale, save_path=save_path))
+                                                        port=port + i, popart_reward=popart_reward, gamma=gamma, \
+                                                        reward_scale=reward_scale, save_path=save_path))
                         else:
                             envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
-                                popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale, \
-                                save_path=save_path))
+                                                        popart_reward=popart_reward, gamma=gamma,
+                                                        reward_scale=reward_scale, \
+                                                        save_path=save_path))
 
                 if len(envs) > 1:
                     # envs = ShmemVecEnv(envs, context='fork')
-                    envs= ShmemVecEnv(envs)
+                    envs = ShmemVecEnv(envs)
                 else:
                     envs = DummyVecEnv(envs)
-                
+
                 if len(envs.observation_space.shape) == 1:
                     if gamma is None:
                         envs = VecNormalize(envs, ret=False)
@@ -138,7 +139,7 @@ def make_vec_envs(env_name,
                         envs = VecPyTorchFrameStack(envs, 4, device)
                 else:
                     envs = Converter(envs)
-                
+
                 return envs
         except CannotAcquireLock:
             print("Try again")
@@ -281,7 +282,7 @@ class VecPyTorchFrameStack(VecEnvWrapper):
 
         if device is None:
             device = torch.device('cpu')
-        self.stacked_obs = torch.zeros((venv.num_envs, ) +
+        self.stacked_obs = torch.zeros((venv.num_envs,) +
                                        low.shape).to(device)
 
         observation_space = gym.spaces.Box(

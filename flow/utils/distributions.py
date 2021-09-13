@@ -1,6 +1,6 @@
 import numpy as np
 
-def gen_request(env):
+def gen_request(env, area=None):
     tp = 0
     if env.distribution == 'random':
         idx = env.k.person.total
@@ -205,6 +205,36 @@ def gen_request(env):
         per_id = 'per_' + str(idx)
         # pos = np.random.uniform(env.inner_length)
         pos = env.time_counter % env.grid_array['inner_length']
+    elif env.distribution == 'random+mode-X1':
+        if np.random.rand() < env.distribution_random_ratio:
+            idx = env.k.person.total
+            in_edge_list = [edge for edge in env.edges.copy() if 'out' not in edge and 'in' not in edge]
+            edge_id1 = np.random.choice(in_edge_list)
+            out_edge_list = [edge for edge in env.edges.copy() if 'out' not in edge and 'in' not in edge]
+
+            if edge_id1 in out_edge_list:
+                out_edge_list.remove(edge_id1)
+            edge_id2 = np.random.choice(out_edge_list)
+
+            per_id = 'per_' + str(idx)
+            if 'in' not in edge_id1:
+                pos = np.random.uniform(20, env.inner_length - 20)
+            else:
+                pos = env.outer_length - 1
+            tp = 2
+        else:
+            idx = env.k.person.total
+            rn, rn2 = np.random.rand(), np.random.rand()
+            if rn < 0.5:
+                edge_id1 = 'bot3_1_0'
+                edge_id2 = 'left1_3_0' if rn2 < 0.5 else 'bot0_3_0'
+                tp = 0
+            else:
+                edge_id1 = 'top3_3_0'
+                edge_id2 = 'left1_0_0' if rn2 < 0.5 else 'top0_1_0'
+                tp = 1
+            per_id = 'per_' + str(idx)
+            pos = np.random.uniform(20, env.inner_length - 20)
     elif env.distribution == "random+mode-X2":
         if np.random.rand() < env.distribution_random_ratio:
             idx = env.k.person.total
@@ -266,6 +296,23 @@ def gen_request(env):
         edge_id2 = 'left1_0_0' if rn < 0.5 else 'top0_1_0'
 
         per_id = 'per_' + str(idx)
+        pos = np.random.uniform(20, env.inner_length - 20)
+    elif env.distribution == 'mode-X1-open':
+        total = []
+        for person in env.k.person.get_ids():
+            if (area == int(person[person.rindex("_") + 1:])):
+                total.append(person)
+        idx = len(total)
+        rn, rn2 = np.random.rand(), np.random.rand()
+        if rn < 0.5:
+            edge_id1 = 'bot3_1_' + str(area)
+            edge_id2 = 'left1_3_' + str(area) if rn2 < 0.5 else 'bot0_3_' + str(area)
+            tp = 0
+        else:
+            edge_id1 = 'top3_3_' + str(area)
+            edge_id2 = 'left1_0_' + str(area) if rn2 < 0.5 else 'top0_1_' + str(area)
+            tp = 1
+        per_id = 'per_' + str(idx) + '_' + str(area)
         pos = np.random.uniform(20, env.inner_length - 20)
     else:
         raise NotImplementedError

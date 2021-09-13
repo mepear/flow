@@ -1,4 +1,4 @@
-"""Environments for networks with traffic lights.
+"""Environments for networks with .
 
 These environments are used to train traffic lights to regulate traffic flow
 through an n x m traffic light grid.
@@ -43,7 +43,7 @@ ADDITIONAL_ENV_PARAMS = {
     "max_stop_time": 1, # in second, intentionally waiting time (deprecated)
     "stop_distance_eps": 1, # in meter, a threshold to determine whether the car is stopping (deprecated)
     "distribution": 'random', # random, mode-1, mode-2, mode-3
-    "reservation_order": 'random', # random or fifo 
+    "reservation_order": 'fifo', # random or fifo
     "n_mid_edge": 0, # number of mid point for an order
     "use_tl": False, # whether using traffic light info
     "max_detour": 1.5, # detour length / minimal length <= max_detour
@@ -101,7 +101,7 @@ class DispatchAndRepositionEnv(Env):
         self.congestion_rate = 0
 
         self.stop_distance_eps = env_params.additional_params['stop_distance_eps']
-        
+
         self.distribution = env_params.additional_params['distribution']
         self.distribution_random_ratio = env_params.additional_params.get('distribution_random_ratio', 0.5)
         # print(self.distribution)
@@ -134,9 +134,9 @@ class DispatchAndRepositionEnv(Env):
         self._preprocess()
 
         self.num_taxi = network.vehicles.num_rl_vehicles
-        self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi) == 'taxi']
+        self.taxis = [taxi for taxi in network.vehicles.ids if network.vehicles.get_type(taxi)[0: 4] == 'taxi']
         self.outside_taxis = []
-        self.background_cars = [car for car in network.vehicles.ids if network.vehicles.get_type(car) != 'taxi']
+        self.background_cars = [car for car in network.vehicles.ids if network.vehicles.get_type(car)[0: 4] != 'taxi']
         assert self.num_taxi == len(self.taxis)
         self.num_vehicles = network.vehicles.num_vehicles
 
@@ -174,6 +174,10 @@ class DispatchAndRepositionEnv(Env):
         # First dimension: Number of taxis + 1
         # Second dimension: sum of number of actions on each dimension
         self.action_mask = torch.zeros((self.num_taxi + 1, sum(self.action_space.nvec)), dtype=bool)
+        self.reward_info = {'wait_penalty': 0, 'exist_penalty': 0, 'pickup_reward': 0,
+                       'miss_penalty': 0, 'tle_penalty': 0, 'time_reward': 0,
+                       'distance_reward': 0}
+        self.reservation_before_end = 0
 
         # test for several functions
         if 'ENV_TEST' in os.environ and os.environ['ENV_TEST'] == '1':
@@ -466,6 +470,10 @@ class DispatchAndRepositionEnv(Env):
             'location': {}
         }
         self.last_edge = dict([(veh_id, None) for veh_id in self.k.vehicle.get_ids()])
+        self.reward_info = {'wait_penalty': 0, 'exist_penalty': 0, 'pickup_reward': 0,
+                       'miss_penalty': 0, 'tle_penalty': 0, 'time_reward': 0,
+                       'distance_reward': 0}
+        self.reservation_before_end = 0
         return observation
 
     @property
@@ -505,9 +513,6 @@ class DispatchAndRepositionEnv(Env):
             if count == self.max_num_order:
                 break
         return np.array(orders).reshape(-1)
-
-    # def _apply_rl_actions(self, rl_actions):
-        # pass
 
     def _apply_rl_actions(self, rl_actions):
         """See class definition."""
@@ -652,10 +657,13 @@ class DispatchAndRepositionEnv(Env):
             self.last_edge[taxi] = edge
 
         pre_reward = reward
+        self.reward_info['wait_penalty'] = 0
         for person in self.k.person.get_ids():
             if not self.k.person.is_matched(person) and not self.k.person.is_removed(person):
                 reward -= self.wait_penalty * timestep
+                self.reward_info['wait_penalty'] -= self.wait_penalty * timestep
                 self.total_wait_time += timestep
+
 
         if self.verbose:
             print('-' * 10, 'un wait', [idx for idx in self.k.person.get_ids() if self.k.person.is_matched(idx) or self.k.person.is_removed(idx)])
@@ -663,25 +671,31 @@ class DispatchAndRepositionEnv(Env):
             print('-' * 10, 'need_reposition', self.__need_reposition)
             print('-' * 10, reward - pre_reward)
 
+        self.reward_info['exist_penalty'] = 0
         for person in self.k.person.get_ids():
             if not self.k.person.is_removed(person):
+                self.reward_info['exist_penalty'] -= self.exist_penalty * timestep
                 reward -= self.exist_penalty * timestep
 
         # pickup price
+        self.reward_info['pickup_reward'] = 0
         for i, taxi in enumerate(self.taxis):
             if self.taxi_states[taxi]['empty'] and taxi in occupied_taxi and distances[i] > 0:
                 assert self.taxi_states[taxi]['pickup_distance'] is None
                 self.taxi_states[taxi]['pickup_distance'] = distances[i]
                 self.taxi_states[taxi]['empty'] = False
                 reward += self.pickup_price
+                self.reward_info['pickup_reward'] += self.pickup_price
                 if self.verbose:
                     print('taxi {} pickup successfully'.format(taxi))
 
         # miss penalty
         persons = self.k.kernel_api.person.getIDList()
+        self.reward_info['miss_penalty'] = 0
         for person in persons:
             if self.k.kernel_api.person.getWaitingTime(person) > self.max_waiting_time:
                 if not self.k.person.is_matched(person) and not self.k.person.is_removed(person):
+                    self.reward_info['miss_penalty'] -= self.miss_penalty
                     reward -= self.miss_penalty
                     self.k.person.remove(person)
                     self.k.person.set_color(person, (0, 255, 255)) # Cyan
@@ -689,16 +703,19 @@ class DispatchAndRepositionEnv(Env):
                         print('tle request', person)
 
         # tle price
+        self.reward_info['tle_penalty'] = 0
         for taxi in pickup_taxi:
             if cur_time - self.k.vehicle.reservation[taxi].reservationTime > self.free_pickup_time:
                 reward -= self.tle_penalty * timestep
 
-        # price about time 
+        # price about time
+        self.reward_info['time_reward'] = 0
         reward += len(occupied_taxi) * self.time_price * timestep
-        
+        self.reward_info['time_reward'] += len(occupied_taxi) * self.time_price * timestep
 
         self.valid_distance = 0
         self.total_taxi_distances = np.zeros(len(self.taxis))
+        self.reward_info['distance_reward'] = 0
         for i, taxi in enumerate(self.taxis):
             # price about distance
             if taxi in occupied_taxi and self.taxi_states[taxi]['pickup_distance'] and distances[i] - self.taxi_states[taxi]['pickup_distance'] > self.starting_distance:
@@ -706,6 +723,7 @@ class DispatchAndRepositionEnv(Env):
                     print(distances[i], self.taxi_states[taxi]['distance'])
                     raise Exception
                 reward += (distances[i] - self.taxi_states[taxi]['distance']) * self.distance_price
+                self.reward_info['distance_reward'] += (distances[i] - self.taxi_states[taxi]['distance']) * self.distance_price
 
             # update distance
             if distances[i] > 0:
@@ -1011,6 +1029,8 @@ class DispatchAndRepositionEnv(Env):
             return 
         per_id, edge_id1, edge_id2, pos, tp = gen_request(self)
         self.k.person.add_request(per_id, edge_id1, edge_id2, pos, tp=tp)
+        if(self.time_counter < 400):
+            self.reservation_before_end += 1
         if self.verbose:
             print('add request from', edge_id1, 'to', edge_id2, 'total', self.k.person.total)
 
