@@ -104,6 +104,7 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
 
     eval_episode_rewards = []
     nums_orders = []
+    nums_waiting = []
     nums_complete_orders = []
     total_pickup_distances = []
     total_pickup_times = []
@@ -178,6 +179,7 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
                 reward_composition['distance_reward'].append(info['episode']['reward_composition']['distance_reward'])
                 reward_composition['tle_penalty'].append(info['episode']['reward_composition']['tle_penalty'])
                 nums_orders.append(info['episode']['num_orders'])
+                nums_waiting.append(info['episode']['num_waiting'])
                 nums_complete_orders.append(info['episode']['num_complete_orders'])
                 total_pickup_distances.append(info['episode']['total_pickup_distance'])
                 total_pickup_times.append(info['episode']['total_pickup_time'])
@@ -323,7 +325,7 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
     name = edge_position['edge_name']
     tp = 1
 
-    df = pd.DataFrame({'pickup_reward': [], 'time_reward': [], 'distance_reward': []})
+    df = pd.DataFrame({'pickup_reward': [], 'time_reward': [], 'distance_reward': [], "order_num": []})
     # df = pd.DataFrame({'reward': []})
     # for i in name:
     #     df[i] = []
@@ -331,6 +333,7 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
     pickup_reward = np.mean(reward_composition['pickup_reward'])
     time_reward = np.mean(reward_composition['time_reward'])
     distance_reward = np.mean(reward_composition['distance_reward'])
+    orders = np.mean(nums_orders)
     pickup_reward = round(pickup_reward, 6)
     time_reward = round(time_reward, 6)
     distance_reward = round(distance_reward, 6)
@@ -343,7 +346,7 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
     # print("########")
     # print(data)
     # print("########")
-    data = [pickup_reward, time_reward, distance_reward]
+    data = [pickup_reward, time_reward, distance_reward, orders]
     df = pd.read_csv('./data/plot_{}.csv'.format(ckpt))
     df.loc[1] = data
     df.to_csv("./data/plot_{}.csv".format(ckpt), index=False, sep=',')

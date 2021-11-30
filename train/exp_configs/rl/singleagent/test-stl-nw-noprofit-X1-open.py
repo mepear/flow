@@ -1,11 +1,11 @@
 """Grid example."""
 from flow.controllers import IDMController, RLController
-from flow.controllers.routing_controllers import FlowRouter_Inner, IndexEnv_Router
+from flow.controllers.routing_controllers import FlowRouter_Inner
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import VehicleParams, PersonParams
 from flow.core.params import TrafficLightParams
 from flow.core.params import SumoCarFollowingParams, SumoLaneChangeParams
-from flow.envs.dispatch_and_reposition_open import DispatchAndRepositionEnv_with_index, ADDITIONAL_ENV_PARAMS
+from flow.envs.dispatch_and_reposition import DispatchAndRepositionEnv, ADDITIONAL_ENV_PARAMS
 from flow.networks import GridnxmNetworkExpand_with_Index
 
 v_enter = 10
@@ -19,8 +19,8 @@ grid_array = {
     "row_num": n_rows,
     "col_num": n_columns,
     "sub_edge_num": 1,
-    "row_idx": 2,
-    "col_idx": 2
+    "row_idx": 1,
+    "col_idx": 1
 }
 
 
@@ -62,7 +62,7 @@ for idx in range(grid_array['row_idx'] * grid_array['col_idx']):
     vehicles.add(
         veh_id="inner_{}".format(idx),
         acceleration_controller=(IDMController, {}),
-        routing_controller=(IndexEnv_Router, {}),
+        routing_controller=(FlowRouter_Inner, {}),
         car_following_params=SumoCarFollowingParams(
             speed_mode='all_checks',
             min_gap=5,
@@ -116,7 +116,7 @@ phases = [{
     "state": "rrrryyyyrrrryyyy"
 }]
 
-for i in range(4):
+for i in range(grid_array["row_idx"] * grid_array["col_idx"]):
     tl_logic.add("center9_{}".format(i), phases=phases)
     tl_logic.add("center10_{}".format(i), phases=phases)
     tl_logic.add("center5_{}".format(i), phases=phases)
@@ -135,22 +135,22 @@ initial_config, net_params = get_non_flow_params(
     add_net_params=additional_net_params)
 
 additional_params = ADDITIONAL_ENV_PARAMS.copy()
-additional_params["time_price"] = 0.02
-additional_params["distance_price"] = 0.02
+additional_params["time_price"] = -0.0075
+additional_params["distance_price"] = 0
 additional_params["pickup_price"] = 1
 additional_params["wait_penalty"] = 0.000
-additional_params["tle_penalty"] = 0.02
+additional_params["tle_penalty"] = 0.0075
 additional_params["person_prob"] = 0.06
 additional_params["max_waiting_time"] = 30
 additional_params["free_pickup_time"] = 0.0
-additional_params["distribution"] = 'mode-X1-open'
+additional_params["distribution"] = 'mode-X1'
 additional_params["n_mid_edge"] = 1
 flow_params = dict(
     # name of the experiment
     exp_tag='grid-intersection',
 
     # name of the flow environment the experiment is running on
-    env_name=DispatchAndRepositionEnv_with_index,
+    env_name=DispatchAndRepositionEnv,
 
     # name of the network class the experiment is running on
     network=GridnxmNetworkExpand_with_Index,

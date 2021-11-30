@@ -99,7 +99,6 @@ class Monitor(gym.Wrapper):
                 observation = self.env.reset(**kwargs)
             except Exception as e:
                 print("reset error with {}, reset again".format(e))
-            # observation = self.env.reset(**kwargs)
         return observation
 
     def step(self, action: Union[np.ndarray, int]):
@@ -126,16 +125,16 @@ class Monitor(gym.Wrapper):
             ep_rew = np.zeros(col_idx * row_idx)
             for i in range(ep_len):
                 ep_rew += self.rewards[i]
-            ep_info = {"r": round(np.sum(ep_rew), 6), "l": ep_len, "t": round(time.time() - self.t_start, 6)}
+            ep_info = {"r": ep_rew, "l": ep_len, "t": round(time.time() - self.t_start, 6)}
             # for key in self.info_keywords:
             #     ep_info[key] = info[key]
             self.episode_rewards.append(ep_rew)
             self.episode_lengths.append(ep_len)
             self.episode_times.append(time.time() - self.t_start)
-            # ep_info['num_orders'] = len(self.env.k.person.get_ids())
+            ep_info['num_orders'] = len(self.env.k.person.get_ids())
             # ep_info['num_waiting'] = len([idx for idx in self.k.person.get_ids() if
             #                               not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
-            # ep_info['num_complete_orders'] = self.env.num_complete_orders
+            ep_info['num_complete_orders'] = np.sum(self.env.num_complete_orders)
             # ep_info['total_pickup_distance'] = self.env.total_pickup_distance
             # ep_info['total_pickup_time'] = self.env.total_pickup_time
             # ep_info['total_valid_distance'] = self.env.total_valid_distance
@@ -145,8 +144,8 @@ class Monitor(gym.Wrapper):
             # ep_info['congestion_rates'] = self.congestion_rates
             # ep_info['mean_velocities'] = self.mean_velocities
             # ep_info['total_co2s'] = self.total_co2s
-            # ep_info['edge'] = {'edge_position': self.env.edge_position, 'edge_name': self.env.edges}
-            # ep_info['statistics'] = self.env.statistics
+            ep_info['edge'] = self.env.edge_position
+            ep_info['statistics'] = self.env.statistics
             # ep_info['reward_composition'] = {'pickup_reward': sum(self.reward_composition['pickup_reward']),
             #                                  'time_reward': sum(self.reward_composition['time_reward']),
             #                                  'distance_reward': sum(self.reward_composition['distance_reward'])}

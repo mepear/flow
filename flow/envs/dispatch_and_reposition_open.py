@@ -1,5 +1,6 @@
 import numpy as np
 from flow.envs.base import Env
+from copy import deepcopy
 import re
 import random
 from numpy.core.fromnumeric import _nonzero_dispatcher
@@ -164,7 +165,6 @@ class DispatchAndRepositionEnv_with_index(Env):
             self.real_in_edges.append("in_bot{}_{}".format(row, ind * self.col_idx))
             self.real_in_edges.append("in_top{}_{}".format(row, ind * self.col_idx + self.col_idx - 1))
         self._preprocess()
-
         # vehicles related environment setting
         self.num_taxi = network.vehicles.num_rl_vehicles
 
@@ -239,32 +239,30 @@ class DispatchAndRepositionEnv_with_index(Env):
         sumo to collect state information each step.
         """
 
-        edges = []
-        for idx in range(self.row_idx * self.col_idx):
-            edges.append([])
-        for edge in self.k.network.get_edge_list():
-            for idx in range(self.col_idx * self.row_idx):
-                if(edge[-(len(str(idx)) + 1):] == ("_" + str(idx))) and 'in' not in edge and 'out' not in edge:
-                    edges[idx].append(edge)
+        initial_ids = [[] for _ in range(self.col_idx * self.row_idx)]
+        for id in self.initial_ids:
+            idx = int(id[id.index("_") + 1])
+            initial_ids[idx].append(id)
 
         # generate starting position for vehicles in the network
-        start_pos, start_lanes = self.k.network.generate_starting_positions(
-            initial_config=self.initial_config,
-            num_vehicles=len(self.initial_ids),
-            net_params=self.net_params,
-            )
+        for idx in range(self.row_idx * self.col_idx):
+            initial_config = deepcopy(self.initial_config)
+            initial_config.index = idx
+            start_pos, start_lanes = self.k.network.generate_starting_positions(
+                initial_config=initial_config,
+                num_vehicles=len(initial_ids[0]),
+                net_params=self.net_params,
+                )
 
-        # save the initial state. This is used in the _reset function
-        for i, veh_id in enumerate(self.initial_ids):
-            idx = int(veh_id[veh_id.index("_") + 1])
-            type_id = self.k.vehicle.get_type(veh_id)
-            pos = start_pos[i][1]
-            lane = start_lanes[i]
-            speed = self.k.vehicle.get_initial_speed(veh_id)
-            edge = np.random.choice(edges[idx])
-            edges[idx].remove(edge)
+            # save the initial state. This is used in the _reset function
+            for i, veh_id in enumerate(initial_ids[idx]):
+                type_id = self.k.vehicle.get_type(veh_id)
+                pos = start_pos[i][1]
+                lane = start_lanes[i]
+                speed = self.k.vehicle.get_initial_speed(veh_id)
+                edge = start_pos[i][0]
 
-            self.initial_state[veh_id] = (type_id, edge, lane, pos, speed)
+                self.initial_state[veh_id] = (type_id, edge, lane, pos, speed)
 
     def _preprocess(self):
         def _add_center(edges):
@@ -383,7 +381,11 @@ class DispatchAndRepositionEnv_with_index(Env):
         a list of length with total segmentation in the network, every state is a numpy array
         """
         state_ret = []
+        x_length = self.inner_length * self.cols
+        y_length = self.inner_length * self.rows
         for idx in range(self.col_idx * self.row_idx):
+            col_idx = idx % self.col_idx
+            row_idx = idx // self.col_idx
             time_feature = [self.time_counter / (self.env_params.horizon * self.env_params.sims_per_step)]
 
             edges_feature = [
@@ -403,7 +405,9 @@ class DispatchAndRepositionEnv_with_index(Env):
                 to_pos = self.inner_length - 2 if 'out' not in to_edge else self.outer_length - 2
                 to_x, to_y = self.k.kernel_api.simulation.convert2D(to_edge, to_pos)
                 # cur_taxi_feature = [0, x, y, self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[0]), self.edges.index(self.k.kernel_api.vehicle.getRoute(taxi)[-1])]
-                cur_taxi_feature = [0, 0, 0, x, y, from_x, from_y, to_x, to_y]  # use (x, y) or edge id
+                cur_taxi_feature = [0, 0, 0, x - x_length * col_idx, y - y_length * row_idx,
+                                    from_x - x_length * col_idx, from_y - y_length * row_idx,
+                                    to_x - x_length * col_idx, to_y - y_length * row_idx]  # use (x, y) or edge id
                 cur_taxi_feature[0 if taxi in empty_taxi else 1 if taxi in pickup_taxi else 2] = 1
                 taxi_feature += cur_taxi_feature
 
@@ -446,7 +450,8 @@ class DispatchAndRepositionEnv_with_index(Env):
                 veh_id = self.taxis[idx].index(taxi)
                 index = [0] * len(self.taxis[0])
                 index[veh_id] = 1
-                mid_edge_feature = [from_x, from_y, to_x, to_y] + index
+                mid_edge_feature = [from_x - x_length * col_idx, from_y - y_length * row_idx,
+                                    to_x - x_length * col_idx, to_y - y_length * row_idx] + index
 
             self._update_action_mask(idx)
 
@@ -467,7 +472,7 @@ class DispatchAndRepositionEnv_with_index(Env):
             if self.__need_reposition[idx]:
                 x, y = self.k.vehicle.get_2d_position(self.__need_reposition[idx], error=(-1, -1))
                 index[self.taxis[idx].index(self.__need_reposition[idx])] = 1
-                need_reposition_taxi_feature = index + [x, y]
+                need_reposition_taxi_feature = index + [x - x_length * col_idx, y - y_length * row_idx]
             else:
                 need_reposition_taxi_feature = index + [-1, -1]
 
@@ -482,7 +487,9 @@ class DispatchAndRepositionEnv_with_index(Env):
 
 
     def reset(self):
-
+        self.__need_mid_edge = []
+        for idx in range(self.col_idx * self.row_idx):
+            self.__need_mid_edge.append(None)
         observation = super().reset()
 
         # dispatch related lists
@@ -490,13 +497,11 @@ class DispatchAndRepositionEnv_with_index(Env):
         self.__pending_orders = []
         self.__reservations = []
         self.__need_reposition = []
-        self.__need_mid_edge = []
         for idx in range(self.row_idx * self.col_idx):
             self.__dispatched_orders.append([])
             self.__pending_orders.append([])
             self.__reservations.append([])
             self.__need_reposition.append(None)
-            self.__need_mid_edge.append(None)
 
         self.taxi_states = []
         for idx in range(self.col_idx * self.row_idx):
@@ -547,7 +552,11 @@ class DispatchAndRepositionEnv_with_index(Env):
     @property
     def _get_order_state(self):
         ord_ret = []
-        for idx in range(self.col_idx * self.row_idx):
+        for idx in range(self.row_idx * self.col_idx):
+            col_idx = idx % self.col_idx
+            row_idx = idx // self.col_idx
+            x_length = self.inner_length * self.cols
+            y_length = self.inner_length * self.rows
             orders = [[-1, -1, -1, -1, -1]] * self.max_num_order
             reservations_raw = self.k.person.get_reservations()
             reservations = []
@@ -568,7 +577,8 @@ class DispatchAndRepositionEnv_with_index(Env):
                 from_x, from_y = self.k.kernel_api.simulation.convert2D(res.fromEdge, res.departPos)
                 to_x, to_y = self.k.kernel_api.simulation.convert2D(res.toEdge, res.arrivalPos)
                 # orders[count] = [ waiting_time, self.edges.index(form_edge), self.edges.index(to_edge) ]
-                orders[count] = [waiting_time, from_x, from_y, to_x, to_y]
+                orders[count] = [waiting_time, from_x - x_length * col_idx, from_y - y_length * row_idx,
+                                 to_x - x_length * col_idx, to_y - y_length * row_idx]
                 count += 1
                 if count == self.max_num_order:
                     break
@@ -664,9 +674,9 @@ class DispatchAndRepositionEnv_with_index(Env):
         for idx in range(self.col_idx * self.row_idx):
             for taxi in self.taxis[idx]:
                 total_taxi.append(taxi)
-        free_taxi = [[]] * self.col_idx * self.row_idx
-        pickup_taxi = [[]] * self.col_idx * self.row_idx
-        occupied_taxi = [[]] * self.col_idx * self.row_idx
+        free_taxi = [[] for _ in range(self.col_idx * self.row_idx)]
+        pickup_taxi = [[] for _ in range(self.col_idx * self.row_idx)]
+        occupied_taxi = [[] for _ in range(self.col_idx * self.row_idx)]
         free_taxi_raw = self.k.vehicle.get_taxi_fleet(0)
         pickup_taxi_raw = self.k.vehicle.get_taxi_fleet(1)
         occupied_taxi_raw = self.k.vehicle.get_taxi_fleet(2)
@@ -875,8 +885,8 @@ class DispatchAndRepositionEnv_with_index(Env):
         for idx in range(self.row_idx * self.col_idx):
             self.total_distance += sum([self.taxi_states[idx][taxi]['distance'] for taxi in self.taxis[idx]])
 
-        nonzero_distance = (self.total_taxi_distances.sum().sum() + self.total_back_distances.sum()) or 0.01
-        reward -= (self.taxi_co2.sum().sum() + self.background_co2.sum()) * 1e-3 / nonzero_distance * self.co2_penalty
+        # nonzero_distance = (self.total_taxi_distances.sum().sum() + self.total_back_distances.sum()) or 0.01
+        # reward -= (self.taxi_co2.sum().sum() + self.background_co2.sum()) * 1e-3 / nonzero_distance * self.co2_penalty
 
         return reward
 
@@ -1015,7 +1025,7 @@ class DispatchAndRepositionEnv_with_index(Env):
             if self.n_mid_edge == 0:
                 pass
             elif self.n_mid_edge == 1:
-                self.action_mask[idx][taxi_id][n_edge + n_taxi + 1:] |= self.banned_mid_edges[idx][from_id, to_id]
+                self.action_mask[idx][taxi_id][n_edge + n_taxi + 1:] |= self.banned_mid_edges[from_id, to_id]
             else:
                 raise NotImplementedError
 

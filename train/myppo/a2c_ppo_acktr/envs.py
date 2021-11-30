@@ -7,6 +7,7 @@ import torch
 from gym.spaces.box import Box
 
 from flow.utils.registry import env_constructor
+from flow.utils.registry_open import env_constructor as env_constructor_open
 
 from baselines import bench
 from baselines.common.atari_wrappers import make_atari, wrap_deepmind
@@ -91,7 +92,10 @@ def make_vec_envs(env_name,
                   flow_params=None,
                   reward_scale=None,
                   verbose=False,
-                  evaluate_id=None):
+                  evaluate_id=None,
+                  is_open=False):
+    
+    env_constructor_fn = env_constructor if not is_open else env_constructor_open
     while True:
         try:
             if evaluate_id is not None:
@@ -110,11 +114,11 @@ def make_vec_envs(env_name,
                         env_params = copy.deepcopy(flow_params)
                         env_params['sim'].seed = seed + i
                         if port is not None:
-                            envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
+                            envs.append(env_constructor_fn(params=env_params, version=i, verbose=verbose, \
                                 port=port + i, popart_reward=popart_reward, gamma=gamma, \
                                 reward_scale=reward_scale, save_path=save_path))
                         else:
-                            envs.append(env_constructor(params=env_params, version=i, verbose=verbose, \
+                            envs.append(env_constructor_fn(params=env_params, version=i, verbose=verbose, \
                                 popart_reward=popart_reward, gamma=gamma, reward_scale=reward_scale, \
                                 save_path=save_path))
 
@@ -124,7 +128,7 @@ def make_vec_envs(env_name,
                 else:
                     envs = DummyVecEnv(envs)
                 
-                if len(envs.observation_space.shape) == 1:
+                if len(envs.observation_space.shape) != 3:
                     if gamma is None:
                         envs = VecNormalize(envs, ret=False)
                     else:

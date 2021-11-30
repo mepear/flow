@@ -65,7 +65,6 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 eval_masks,
                 action_masks=action_masks,
                 deterministic=True)
-        
         values.append(value) # To be used
 
         # Obser reward and next obs
@@ -75,7 +74,6 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
             [[0.0] if done_ else [1.0] for done_ in done],
             dtype=torch.float32,
             device=device)
-        
         try:
             action_masks = torch.cat([info['action_mask'] for info in infos], dim=0)
         except KeyError:

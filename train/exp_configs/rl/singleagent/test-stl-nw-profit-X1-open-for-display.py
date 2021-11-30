@@ -1,6 +1,6 @@
 """Grid example."""
 from flow.controllers import IDMController, RLController
-from flow.controllers.routing_controllers import FlowRouter_Inner, IndexEnv_Router
+from flow.controllers.routing_controllers import IndexEnv_Router, FlowRouter_Inner
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import VehicleParams, PersonParams
 from flow.core.params import TrafficLightParams
@@ -49,7 +49,7 @@ def get_non_flow_params(enter_speed, add_net_params):
     additional_init_params = {'enter_speed': enter_speed}
 
     initial = InitialConfig(
-        x0=2.5, spacing='uniform', min_gap=10, additional_params=additional_init_params, edges_distribution='inner') # gap needs to be large enough
+        x0=2.5, spacing='uniform', min_gap=10, additional_params=additional_init_params, edges_distribution='index') # gap needs to be large enough
     net = NetParams(additional_params=add_net_params)
 
     return initial, net
@@ -62,7 +62,7 @@ for idx in range(grid_array['row_idx'] * grid_array['col_idx']):
     vehicles.add(
         veh_id="inner_{}".format(idx),
         acceleration_controller=(IDMController, {}),
-        routing_controller=(IndexEnv_Router, {}),
+        routing_controller=(FlowRouter_Inner, {}),
         car_following_params=SumoCarFollowingParams(
             speed_mode='all_checks',
             min_gap=5,
@@ -116,7 +116,7 @@ phases = [{
     "state": "rrrryyyyrrrryyyy"
 }]
 
-for i in range(4):
+for i in range(grid_array["row_idx"] * grid_array["col_idx"]):
     tl_logic.add("center9_{}".format(i), phases=phases)
     tl_logic.add("center10_{}".format(i), phases=phases)
     tl_logic.add("center5_{}".format(i), phases=phases)

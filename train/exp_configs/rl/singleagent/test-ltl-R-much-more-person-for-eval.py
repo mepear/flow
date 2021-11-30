@@ -1,12 +1,14 @@
 """Grid example."""
-from flow.controllers import IDMController, RLController
-from flow.controllers.routing_controllers import FlowRouter_Inner, IndexEnv_Router
+from flow.controllers import GridRouter, IDMController, RLController
+from flow.controllers.routing_controllers import MinicityRouter
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import VehicleParams, PersonParams
 from flow.core.params import TrafficLightParams
 from flow.core.params import SumoCarFollowingParams, SumoLaneChangeParams
-from flow.envs.dispatch_and_reposition_open import DispatchAndRepositionEnv_with_index, ADDITIONAL_ENV_PARAMS
-from flow.networks import GridnxmNetworkExpand_with_Index
+from flow.core.params import InFlows
+# from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
+from flow.envs.dispatch_and_reposition import DispatchAndRepositionEnv, ADDITIONAL_ENV_PARAMS
+from flow.networks import GridnxmNetwork
 
 v_enter = 10
 inner_length = 50
@@ -15,12 +17,9 @@ n_columns = 4
 
 grid_array = {
     "inner_length": inner_length,
-    "outer_length": inner_length // 2,
     "row_num": n_rows,
     "col_num": n_columns,
-    "sub_edge_num": 1,
-    "row_idx": 2,
-    "col_idx": 2
+    "sub_edge_num": 1
 }
 
 
@@ -47,9 +46,8 @@ def get_non_flow_params(enter_speed, add_net_params):
         network-specific parameters used to generate the network
     """
     additional_init_params = {'enter_speed': enter_speed}
-
     initial = InitialConfig(
-        x0=2.5, spacing='uniform', min_gap=10, additional_params=additional_init_params, edges_distribution='inner') # gap needs to be large enough
+        x0=2.5, spacing='uniform', min_gap=10, additional_params=additional_init_params) # gap needs to be large enough
     net = NetParams(additional_params=add_net_params)
 
     return initial, net
@@ -57,41 +55,37 @@ def get_non_flow_params(enter_speed, add_net_params):
 persons = PersonParams()
 vehicles = VehicleParams()
 
-# Theses vehicles can only stay in this network thus they shouldn't be created in some out paths and need special router
-for idx in range(grid_array['row_idx'] * grid_array['col_idx']):
-    vehicles.add(
-        veh_id="inner_{}".format(idx),
-        acceleration_controller=(IDMController, {}),
-        routing_controller=(IndexEnv_Router, {}),
-        car_following_params=SumoCarFollowingParams(
-            speed_mode='all_checks',
-            min_gap=5,
-            decel=10.0,  # avoid collisions at emergency stops
-            max_speed=10,
-        ),
-        lane_change_params=SumoLaneChangeParams(
-            lane_change_mode="no_lc_safe",
-        ),
-        initial_speed=0,
-        num_vehicles=25)
-
-# These vehicles are taxis
-for idx in range(grid_array['row_idx'] * grid_array['col_idx']):
-    vehicles.add(
-        veh_id="taxi_{}".format(idx),
-        initial_speed=0,
-        acceleration_controller=(RLController, {}),
-        car_following_params=SumoCarFollowingParams(
-            speed_mode='all_checks',
-            min_gap=5,
-            decel=10.0,  # avoid collisions at emergency stops
-            max_speed=10,
-        ),
-        lane_change_params=SumoLaneChangeParams(
-            lane_change_mode="sumo_default",
-        ),
-        num_vehicles=20,
-        is_taxi=False)
+vehicles.add(
+    veh_id="idm",
+    acceleration_controller=(IDMController, {}),
+    routing_controller=(MinicityRouter, {}),
+    car_following_params=SumoCarFollowingParams(
+        speed_mode='all_checks',
+        min_gap=5,
+        decel=10.0,  # avoid collisions at emergency stops
+        max_speed=10,
+    ),
+    lane_change_params=SumoLaneChangeParams(
+        lane_change_mode="no_lc_safe",
+    ),
+    initial_speed=0,
+    num_vehicles=25)
+vehicles.add(
+    veh_id="taxi",
+    initial_speed=0,
+    acceleration_controller=(RLController, {}),
+    # routing_controller=(MinicityRouter, {}),
+    car_following_params=SumoCarFollowingParams(
+        speed_mode='all_checks',
+        min_gap=5,
+        decel=10.0,  # avoid collisions at emergency stops
+        max_speed=10,
+    ),
+    lane_change_params=SumoLaneChangeParams(
+        lane_change_mode="sumo_default",
+    ),
+    num_vehicles=20,
+    is_taxi=False)
 
 tl_logic = TrafficLightParams(baseline=False)
 phases = [{
@@ -115,12 +109,10 @@ phases = [{
     "maxDur": "1",
     "state": "rrrryyyyrrrryyyy"
 }]
-
-for i in range(4):
-    tl_logic.add("center9_{}".format(i), phases=phases)
-    tl_logic.add("center10_{}".format(i), phases=phases)
-    tl_logic.add("center5_{}".format(i), phases=phases)
-    tl_logic.add("center6_{}".format(i), phases=phases)
+tl_logic.add("center9", phases=phases)
+tl_logic.add("center10", phases=phases)
+tl_logic.add("center5", phases=phases)
+tl_logic.add("center6", phases=phases)
 
 additional_net_params = {
     "grid_array": grid_array,
@@ -139,21 +131,22 @@ additional_params["time_price"] = 0.02
 additional_params["distance_price"] = 0.02
 additional_params["pickup_price"] = 1
 additional_params["wait_penalty"] = 0.000
-additional_params["tle_penalty"] = 0.02
-additional_params["person_prob"] = 0.06
+additional_params["tle_penalty"] = 0
+additional_params["person_prob"] = 0.18
 additional_params["max_waiting_time"] = 30
 additional_params["free_pickup_time"] = 0.0
-additional_params["distribution"] = 'mode-X1-open'
+additional_params["distribution"] = 'random'
 additional_params["n_mid_edge"] = 1
+# additional_params["use_tl"] = True
 flow_params = dict(
     # name of the experiment
     exp_tag='grid-intersection',
 
     # name of the flow environment the experiment is running on
-    env_name=DispatchAndRepositionEnv_with_index,
+    env_name=DispatchAndRepositionEnv,
 
     # name of the network class the experiment is running on
-    network=GridnxmNetworkExpand_with_Index,
+    network=GridnxmNetwork,
 
     # simulator that is used by the experiment
     simulator='traci',
