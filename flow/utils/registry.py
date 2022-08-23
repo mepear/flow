@@ -61,6 +61,7 @@ class Monitor(gym.Wrapper):
         self.reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
                        'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
                        'distance_reward': []}
+        self.car_num = {'free_car': [], 'pick_up_car': [], 'occupied_car': []}
         self.mean_velocities = []
         self.total_co2s = []
         self.congestion_rates = []
@@ -86,6 +87,7 @@ class Monitor(gym.Wrapper):
         self.reward_composition = {'wait_penalty': [], 'exist_penalty': [], 'pickup_reward': [],
                        'miss_penalty': [], 'tle_penalty': [], 'time_reward': [],
                        'distance_reward': []}
+        self.car_num = {'free_car': [], 'pick_up_car': [], 'occupied_car': []}
         self.mean_velocities = []
         self.total_co2s = []
         self.congestion_rates = []
@@ -120,6 +122,9 @@ class Monitor(gym.Wrapper):
         self.reward_composition['miss_penalty'].append(self.env.reward_info['miss_penalty'])
         self.reward_composition['time_reward'].append(self.env.reward_info['time_reward'])
         self.reward_composition['distance_reward'].append(self.env.reward_info['distance_reward'])
+        self.car_num['free_car'].append(len(self.env.k.vehicle.get_taxi_fleet(0)))
+        self.car_num['pick_up_car'].append(len(self.env.k.vehicle.get_taxi_fleet(1)))
+        self.car_num['occupied_car'].append(len(self.env.k.vehicle.get_taxi_fleet(2)))
         self.mean_velocities.append(self.env.mean_velocity.copy())
         self.total_co2s.append(np.concatenate([self.env.background_co2, self.env.taxi_co2]))
         self.congestion_rates.append(self.env.congestion_rate)
@@ -155,6 +160,11 @@ class Monitor(gym.Wrapper):
                         'tle_penalty': sum(self.reward_composition['tle_penalty']),
                         'time_reward': sum(self.reward_composition['time_reward']),
                        'distance_reward': sum(self.reward_composition['distance_reward'])}
+            ep_info['car_num'] = self.car_num
+            ep_info['rev_count'] = self.env.rev_count
+            ep_info['prob_nearest'] = float(self.env.nearest_count) / self.env.rev_count
+            ep_info['true_dist_per_rev'] = self.env.true_distance / self.env.rev_count
+            ep_info['nearest_dist_per_rev'] = self.env.nearest_distance / self.env.rev_count
             ep_info.update(self.current_reset_info)
             if self.logger:
                 self.logger.writerow(ep_info)

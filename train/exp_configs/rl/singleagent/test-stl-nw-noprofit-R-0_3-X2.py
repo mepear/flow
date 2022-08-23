@@ -19,7 +19,11 @@ grid_array = {
     "inner_length": inner_length,
     "row_num": n_rows,
     "col_num": n_columns,
-    "sub_edge_num": 1
+    "sub_edge_num": 1,
+    # "random_reposition": True,
+    # "nearest_dispatch": True,
+    # "random_dispatch": True,
+    # "no_mid_edge": True,
 }
 
 

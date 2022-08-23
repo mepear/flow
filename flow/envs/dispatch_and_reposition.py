@@ -5,6 +5,7 @@ through an n x m traffic light grid.
 """
 
 import numpy as np
+import copy
 import re
 import random
 from numpy.core.fromnumeric import _nonzero_dispatcher
@@ -63,6 +64,10 @@ class DispatchAndRepositionEnv(Env):
         self.cols = self.grid_array["col_num"]
         self.inner_length = self.grid_array['inner_length']
         self.outer_length = self.grid_array.get("outer_length", None)
+        self.nearest_dispatch = self.grid_array.get("nearest_dispatch", False)
+        self.random_dispatch = self.grid_array.get("random_dispatch", False)
+        self.random_reposition = self.grid_array.get("random_reposition", False)
+        self.no_mid_edge = self.grid_array.get("no_mid_edge", False)
 
         self.pickup_price = env_params.additional_params['pickup_price']
         self.time_price = env_params.additional_params['time_price']
@@ -116,6 +121,7 @@ class DispatchAndRepositionEnv(Env):
         }
 
         self.edges = self.k.network.get_edge_list()
+        self.edge_candidate = copy.deepcopy(self.edges)
         # in/out flow edge cannot be visited by taxi
         self.flow_edges = []
         self.in_edges = []
@@ -155,7 +161,8 @@ class DispatchAndRepositionEnv(Env):
             for edge in self.edges]
         self.statistics = {
             'route': {},
-            'location': {}
+            'location': {},
+            'destination': {}
         }
         self.last_edge = dict([(veh_id, None) for veh_id in self.k.vehicle.get_ids()])
 
@@ -178,6 +185,15 @@ class DispatchAndRepositionEnv(Env):
                        'miss_penalty': 0, 'tle_penalty': 0, 'time_reward': 0,
                        'distance_reward': 0}
         self.reservation_before_end = 0
+        self.edge_dist = {}
+
+        # Calculate probability the nearest car to be chosen
+        self.rev_count = 0
+        self.nearest_count = 0
+
+        # Calculate the accumulated distance between nearest car and true chosen car
+        self.nearest_distance = 0
+        self.true_distance = 0
 
         # test for several functions
         if 'ENV_TEST' in os.environ and os.environ['ENV_TEST'] == '1':
@@ -430,6 +446,8 @@ class DispatchAndRepositionEnv(Env):
             need_reposition_taxi_feature = index + [-1, -1]
 
         state = time_feature + edges_feature + taxi_feature + tl_feature + order_feature + mid_edge_feature + need_reposition_taxi_feature
+        # print("*" * 9 + "state" + "*" * 9)
+        # print(np.array(state))
         return np.array(state)
     
     def _get_infos(self):
@@ -467,13 +485,19 @@ class DispatchAndRepositionEnv(Env):
         self.outside_taxis = []
         self.statistics = {
             'route': {},
-            'location': {}
+            'location': {},
+            'destination': {}
         }
         self.last_edge = dict([(veh_id, None) for veh_id in self.k.vehicle.get_ids()])
         self.reward_info = {'wait_penalty': 0, 'exist_penalty': 0, 'pickup_reward': 0,
                        'miss_penalty': 0, 'tle_penalty': 0, 'time_reward': 0,
                        'distance_reward': 0}
         self.reservation_before_end = 0
+        self.edge_dist = {}
+        self.rev_count = 0
+        self.nearest_count = 0
+        self.nearest_distance = 0
+        self.true_distance = 0
         return observation
 
     @property
@@ -526,6 +550,10 @@ class DispatchAndRepositionEnv(Env):
         if self.__need_reposition:
             if not self.__reservations or rl_actions[1] == self.num_taxi or \
                 self.taxis[rl_actions[1]] != self.__need_reposition:
+                if self.random_reposition:
+                    rl_actions[0] = random.randint(0, len(self.edges) - 1)
+                    while rl_actions[0] in self.in_edges + self.flow_edges + self.out_edges:
+                        rl_actions[0] = random.randint(0, len(self.edges) - 1)
                 # taxi = self.__need_reposition
                 # stop = self.k.kernel_api.vehicle.getStops(taxi, limit=1)[0]
                 # print(self.k.vehicle.get_edge(taxi), stop.lane, self.k.vehicle.get_position(taxi), stop.startPos, stop.endPos)
@@ -534,7 +562,58 @@ class DispatchAndRepositionEnv(Env):
                 self.k.vehicle.reposition_taxi_by_road(self.__need_reposition, self.edges[rl_actions[0]])
                 reposition_stat[rl_actions[0]] += 1
                 self.__need_reposition = None
+            # else:
+            #     print("************")
+            #     print("No reposition")
+            #     print("************")
         if self.__reservations:
+            # for edge in self.edge_candidate:
+            #     edge_name_begin = self.k.kernel_api.person.getEdges(self.__reservations[0].persons[0], 0)[0]
+            #     edge_name_end = self.k.kernel_api.person.getEdges(self.__reservations[0].persons[0], 0)[1]
+            #     route_1 = self.k.kernel_api.simulation.findRoute(edge_name_begin, edge)
+            #     route_2 = self.k.kernel_api.simulation.findRoute(edge, edge_name_end)
+            #     route_3 = self.k.kernel_api.simulation.findRoute(edge_name_begin, edge_name_end)
+            #     if (len(route_1.edges) + len(route_2.edges) - 1 != len(route_3.edges)):
+            #         self.edge_candidate.remove(edge)
+            # print(self.edge_candidate)
+            # for edge in self.edge_candidate:
+            #     print(self.edges.index(edge))
+            edge_name = self.k.kernel_api.person.getEdges(self.__reservations[0].persons[0], 0)[0]
+            lane_position = self.k.kernel_api.person.getLanePosition(self.__reservations[0].persons[0])
+            id, distance= self.nearest_dispatch_result(edge_name, lane_position)
+            if (distance != None and rl_actions[1] != self.num_taxi):
+                self.nearest_distance += distance
+                taxi = self.taxis[rl_actions[1]]
+                taxi_edge = self.k.vehicle.get_edge(taxi)
+                taxi_position = self.k.vehicle.get_position(taxi)
+                route = self.k.kernel_api.simulation.findRoute(taxi_edge, edge_name)
+                taxi_distance = (len(route.edges) - 1) * self.inner_length + lane_position - taxi_position
+                self.true_distance += taxi_distance
+            if (id != None):
+                destination = self.k.kernel_api.vehicle.getRoute(self.taxis[id])[-1]
+                if 'destination' not in self.statistics['destination']:
+                    self.statistics['destination']['destination'] = np.zeros((len(self.edges)))
+                self.statistics['destination']['destination'][self.edges.index(destination)] += 1
+                self.rev_count += 1
+                if (rl_actions[1] == id):
+                    self.nearest_count += 1
+            if self.nearest_dispatch:
+                if (id != None):
+                    rl_actions[1] = id
+            if self.random_dispatch:
+                # print("*" * 9 + "Random Dispatch" + "*" * 9)
+                free_cars = copy.deepcopy(self.k.vehicle.get_taxi_fleet(0))
+                if len(free_cars) != 0:
+                    car_name = random.choice(free_cars)
+                    while (self.k.vehicle.get_edge(car_name) == edge_name and
+                        self.k.vehicle.get_position(car_name) > lane_position):
+                        free_cars.remove(car_name)
+                        if (len(free_cars) == 0):
+                            car_name = None
+                            break
+                        car_name = random.choice(free_cars)
+                    if (car_name != None):
+                        rl_actions[1] = self.taxis.index(car_name)
             if rl_actions[1] < self.num_taxi: # do not dispatch when the special action is selected
                 # check if the dispatch is valid
                 # cur_taxi = self.taxis[rl_actions[0]]
@@ -544,6 +623,13 @@ class DispatchAndRepositionEnv(Env):
                 # if not (cur_edge == cur_res.fromEdge and cur_pos > cur_res.departPos):
                 self.__pending_orders.append([self.__reservations[0], self.taxis[rl_actions[1]]]) # notice that we may dispach a order to a occupied_taxi
         if self.__need_mid_edge:
+            # For certain edge to generate static congestion
+            # print("*" * 10)
+            # print(self.edges.index("left3_1_0"))
+            # print("*" * 10)
+            # rl_actions[2] = random.choice([17,18,21,22])
+            if self.no_mid_edge:
+                rl_actions[2] = -1
             mid_edges = [self.edges[edge_id] for edge_id in rl_actions[2:]]
             if 'flow' not in mid_edges[0]:
                 if -1 in rl_actions[2:]:
@@ -666,6 +752,9 @@ class DispatchAndRepositionEnv(Env):
 
 
         if self.verbose:
+            # print("-" * 10, 'free_cars', self.k.vehicle.get_taxi_fleet(0))
+            # print("-" * 10, 'pick_up_cars', self.k.vehicle.get_taxi_fleet(1))
+            # print("-" * 10, 'occupied_cars', self.k.vehicle.get_taxi_fleet(2))
             print('-' * 10, 'un wait', [idx for idx in self.k.person.get_ids() if self.k.person.is_matched(idx) or self.k.person.is_removed(idx)])
             print('-' * 10, 'waiting', [idx for idx in self.k.person.get_ids() if not self.k.person.is_matched(idx) and not self.k.person.is_removed(idx)])
             print('-' * 10, 'need_reposition', self.__need_reposition)
@@ -1070,3 +1159,72 @@ class DispatchAndRepositionEnv(Env):
                 if self.verbose:
                     print('order {} dispatch tle'.format(res))
         self.__pending_orders = remain_pending_orders
+
+    def nearest_dispatch_result(self, edge_name, lane_position):
+        if edge_name not in self.edge_dist.keys():
+            self.edge_dist[edge_name] = {}
+            for edge in self.edges:
+                if edge not in self.in_edges + self.out_edges + self.flow_edges:
+                    route_len = len(self.k.kernel_api.simulation.findRoute(edge, edge_name).edges)
+                    if route_len-1 not in self.edge_dist[edge_name].keys():
+                        self.edge_dist[edge_name][route_len-1] = []
+                    self.edge_dist[edge_name][route_len-1].append(edge)
+        free_cars = self.k.vehicle.get_taxi_fleet(0)
+        distance = None
+        chosen_taxi = None
+        if len(free_cars) < 25:
+            for taxi in free_cars:
+                taxi_edge = self.k.vehicle.get_edge(taxi)
+                taxi_position = self.k.vehicle.get_position(taxi)
+                route = self.k.kernel_api.simulation.findRoute(taxi_edge, edge_name)
+                if (len(route.edges) == 1):
+                    if (taxi_position <= lane_position):
+                        taxi_distance = lane_position - taxi_position
+                    else:
+                        taxi_distance = float("inf")
+                else:
+                    taxi_distance = (len(route.edges) - 1) * self.inner_length + lane_position - taxi_position
+                if (distance == None):
+                    distance = taxi_distance
+                    chosen_taxi = taxi
+                elif (distance > taxi_distance):
+                    distance = taxi_distance
+                    chosen_taxi = taxi
+                # print("*" * 10)
+                # print(distance)
+                # print(taxi)
+                # print(taxi_distance)
+                # print(edge_name)
+                # print("*" * 10)
+        else:
+            for i in range(max(list(self.edge_dist[edge_name].keys()))):
+                for edge in self.edge_dist[edge_name][i]:
+                    edge_taxis = self.k.kernel_api.edge.getLastStepVehicleIDs(edge)
+                    if (len(set(edge_taxis) & set(free_cars)) != 0):
+                        chosen_taxi_list = []
+                        for car in free_cars:
+                            if car in edge_taxis:
+                                if (i != 0) or (self.k.vehicle.get_position(car) < lane_position):
+                                    chosen_taxi_list.append(car)
+                        if len(chosen_taxi_list) > 0:
+                            chosen_taxi = random.choice(chosen_taxi_list)
+                            break
+                if chosen_taxi != None:
+                    break
+        if (chosen_taxi != None) and (distance != float("inf")):
+            id = self.taxis.index(chosen_taxi)
+        else:
+            # print("**********")
+            # print("Error : No Free Cars")
+            # print("**********")
+            id = None
+            distance = None
+        # print("**************")
+        # print("We dispatch {} to {}".format(chosen_taxi, edge_name))
+        # print("Request position : {} and {}".format(edge_name, lane_position))
+        # print("Car position : {} and {}".format(self.k.vehicle.get_edge(chosen_taxi),
+        #                                         self.k.vehicle.get_position(chosen_taxi)))
+        # print("Edge Index : {}".format(self.edges.index(edge_name)))
+        # print("**************")
+
+        return id, distance

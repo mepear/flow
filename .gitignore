@@ -115,3 +115,7 @@ flow.ang
 trained_models/
 eval_models/
 # train_scripts
+*.jpg
+*.mp4
+plot.py
+simple.py

@@ -297,6 +297,19 @@ def gen_request(env, area=None):
 
         per_id = 'per_' + str(idx)
         pos = np.random.uniform(20, env.inner_length - 20)
+    elif env.distribution == 'mode-X1-change':
+        idx = env.k.person.total
+        rn = np.random.rand()
+        if rn < 0.5:
+            edge_id1 = 'bot3_1_0'
+            edge_id2 = 'left1_3_0'
+            tp = 0
+        else:
+            edge_id1 = 'top3_3_0'
+            edge_id2 = 'left1_0_0'
+            tp = 1
+        per_id = 'per_' + str(idx)
+        pos = np.random.uniform(20, env.inner_length - 20)
     elif env.distribution == 'mode-X1-open':
         total = []
         for person in env.k.person.get_ids():

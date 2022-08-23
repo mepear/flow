@@ -11,6 +11,15 @@ def get_args(args):
         '--experiment-name', default='default', help='experiment name for save models'
     )
     parser.add_argument(
+        "--experiment-name_2", default='default', help='combined experiment name for save models'
+    )
+    parser.add_argument(
+        "--experiment-name_3", default='default', help='combined experiment name for save models'
+    )
+    parser.add_argument(
+        "--random-rate", default=None, type=int, help="the rate of random order"
+    )
+    parser.add_argument(
         "--eval-ckpt", default="0",  type=str
     )
     parser.add_argument(

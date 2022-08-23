@@ -42,16 +42,34 @@ def eval_ppo(flow_params=None):
     device = torch.device("cuda:0" if args.cuda else "cpu")
 
     save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
+    save_path_2 = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name_2)
+    save_path_3 = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name_3)
     pt =  os.path.join(save_path, str(args.eval_ckpt) + ".pt")
+    pt_2 = os.path.join(save_path_2, str(args.eval_ckpt) + ".pt")
+    pt_3 = os.path.join(save_path_3, str(args.eval_ckpt) + ".pt")
     actor_critic, ob_rms = torch.load(pt, map_location='cpu')
     actor_critic.to(device)
+    actor_critic_2 = None
+    ob_rms_2 = None
+    actor_critic_3 = None
+    ob_rms_3 = None
+    if args.experiment_name_2 != 'default':
+        actor_critic_2, ob_rms_2 = torch.load(pt_2, map_location='cpu')
+        actor_critic_2.to(device)
+    if args.experiment_name_3 != 'default':
+        actor_critic_3, ob_rms_3 = torch.load(pt_3, map_location='cpu')
+        actor_critic_3.to(device)
 
     screenshot_path = os.path.join(save_path, "images") if args.save_screenshot else None
 
     flow_params['sim'].render = not args.disable_render_during_eval
     flow_params['sim'].save_render = screenshot_path
+    if args.random_rate != None:
+        flow_params['env'].additional_params['distribution_random_ratio'] = float(args.random_rate) / 100
     eval_envs = make_vec_envs(args.env_name, args.seed, args.num_processes, \
         None, save_path, True, device=device, flow_params=flow_params, verbose=args.verbose)
     evaluate(actor_critic, eval_envs, ob_rms, args.num_processes, device, save_path=save_path, \
-        do_plot_congestion=args.plot_congestion, ckpt=args.eval_ckpt, verbose=True)
+        do_plot_congestion=args.plot_congestion, ckpt=args.eval_ckpt, verbose=True, \
+             actor_critic_2=actor_critic_2, actor_critic_3=actor_critic_3,
+             ob_rms_2=ob_rms_2, ob_rms_3=ob_rms_3, random_rate=args.random_rate)
     eval_envs.close()

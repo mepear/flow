@@ -13,6 +13,7 @@ from copy import deepcopy
 import sys
 import random
 import time
+import datetime
 from collections import deque
 
 import gym
@@ -76,7 +77,13 @@ def plot_correlation(submodule, ckpt):
     utils.cleanup_log_dir(eval_log_dir)
 
     torch.set_num_threads(1)
-    device = torch.device("cuda:0" if args.cuda else "cpu")
+
+    a = datetime.datetime.now().microsecond % 5
+
+    time.sleep(a * 5)
+    os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp')
+    memory_gpu = [int(x.split()[2]) for x in open('tmp', 'r').readlines()]
+    device = torch.device("cuda:{}".format(np.argmax(memory_gpu)) if args.cuda else "cpu")
 
     save_path = os.path.join(os.path.join(args.save_dir, args.algo), args.experiment_name)
     pt = os.path.join(save_path, str(ckpt) + ".pt")
@@ -134,7 +141,6 @@ def evaluate(actor_critic, eval_envs, num_processes, ob_rms, device, save_path=N
     eval_masks = torch.zeros(num_processes, 1, device=device)
     action_masks = None
     values = []
-
 
     while len(eval_episode_rewards) < num_processes:
         with torch.no_grad():

@@ -1,6 +1,7 @@
 from numpy.lib.type_check import _nan_to_num_dispatcher
 from flow.core.params import VehicleParams
 import numpy as np
+import pandas as pd
 import torch
 import os
 import traci
@@ -15,7 +16,8 @@ from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
 def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=None, writer=None, \
-    total_num_steps=None, do_plot_congestion=False, ckpt=None, verbose=False):
+    total_num_steps=None, do_plot_congestion=False, ckpt=None, verbose=False, ob_rms_2=None, \
+             ob_rms_3=None, actor_critic_2=None, actor_critic_3=None, random_rate=None):
     # # flow_params['sim'].render = True
     # eval_envs = make_vec_envs(env_name, seed, num_processes,
     #                           None, eval_log_dir, device, True, flow_params=flow_params, port=port, verbose=verbose)
@@ -49,6 +51,11 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     total_back_distances = [[] for _ in range(eval_envs.num_envs)]
     edge_position = None
     statistics = []
+    car_num = {'free_car': [], 'pick_up_car': [], 'occupied_car': []}
+    rev_count = None
+    nearest_prob = None
+    nearest_dist_per_rev = None
+    true_dist_per_rev = None
 
     obs = eval_envs.reset()
 
@@ -59,17 +66,51 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
     values = []
     while len(eval_episode_rewards) < num_processes:
         with torch.no_grad():
-            value, action, _, eval_recurrent_hidden_states = actor_critic.act(
-                obs,
-                eval_recurrent_hidden_states,
-                eval_masks,
-                action_masks=action_masks,
-                deterministic=True)
-        values.append(value) # To be used
+            if actor_critic_2 == None:
+                value, action, _, eval_recurrent_hidden_states = actor_critic.act(
+                    obs,
+                    eval_recurrent_hidden_states,
+                    eval_masks,
+                    action_masks=action_masks,
+                    deterministic=True)
+            else:
+                obs_1 = np.clip((obs.cpu().numpy() - ob_rms.mean) / np.sqrt(ob_rms.var + eval_envs.epsilon),
+                        -eval_envs.clipob, eval_envs.clipob)
+                obs_1 = torch.from_numpy(obs_1).cuda().float()
+                obs_2 = np.clip((obs.cpu().numpy() - ob_rms_2.mean) / np.sqrt(ob_rms_2.var + eval_envs.epsilon),
+                        -eval_envs.clipob, eval_envs.clipob)
+                obs_2 = torch.from_numpy(obs_2).cuda().float()
+                obs_3 = np.clip((obs.cpu().numpy() - ob_rms_3.mean) / np.sqrt(ob_rms_3.var + eval_envs.epsilon),
+                        -eval_envs.clipob, eval_envs.clipob)
+                obs_3 = torch.from_numpy(obs_3).cuda().float()
+                value_1, action_1, _, eval_recurrent_hidden_states = actor_critic.act(
+                    obs_1,
+                    eval_recurrent_hidden_states,
+                    eval_masks,
+                    action_masks=action_masks,
+                    deterministic=True)
+                value_2, action_2, _, eval_recurrent_hidden_states = actor_critic_2.act(
+                    obs_2,
+                    eval_recurrent_hidden_states,
+                    eval_masks,
+                    action_masks=action_masks,
+                    deterministic=True)
+                value_3, action_3, _, eval_recurrent_hidden_states = actor_critic_3.act(
+                    obs_3,
+                    eval_recurrent_hidden_states,
+                    eval_masks,
+                    action_masks=action_masks,
+                    deterministic=True)
+                action_1 = action_1[:, 0].unsqueeze(1)
+                action_2 = action_2[:, 1].unsqueeze(1)
+                action_3 = action_3[:, 2].unsqueeze(1)
+                action = torch.cat((action_1, action_2, action_3), 1)
+
+
+        # values.append(value) # To be used
 
         # Obser reward and next obs
         obs, _, done, infos = eval_envs.step(action)
-
         eval_masks = torch.tensor(
             [[0.0] if done_ else [1.0] for done_ in done],
             dtype=torch.float32,
@@ -110,6 +151,17 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
                 mean_velocities.append(np.mean(info['episode']['mean_velocities'], axis=0))
                 edge_position = info['episode']['edge_position']
                 statistics.append(info['episode']['statistics'])
+                car_num['free_car'].append(info['episode']['car_num']['free_car'])
+                car_num['pick_up_car'].append(info['episode']['car_num']['pick_up_car'])
+                car_num['occupied_car'].append(info['episode']['car_num']['occupied_car'])
+                rev_count = info['episode']['rev_count']
+                nearest_prob = info['episode']['prob_nearest']
+                nearest_dist_per_rev = info['episode']['nearest_dist_per_rev']
+                true_dist_per_rev = info['episode']['true_dist_per_rev']
+
+    avg_car_num = {'free_car': np.sum(car_num['free_car'], axis=0) / float(len(car_num['free_car'])),
+                   'pick_up_car': np.sum(car_num['pick_up_car'], axis=0) / float(len(car_num['pick_up_car'])),
+                   'occupied_car': np.sum(car_num['occupied_car'], axis=0) / float(len(car_num['occupied_car']))}
 
     print(" Evaluation using {} episodes: mean reward {:.5f}\n".format(
         len(eval_episode_rewards), np.mean(eval_episode_rewards)))
@@ -255,10 +307,41 @@ def evaluate(actor_critic, eval_envs, ob_rms, num_processes, device, save_path=N
         print('eval/reservation_before_end mean {:.2f} median {:.2f}'.format(\
             np.mean(reservation_before_end), np.median(reservation_before_end)))
 
+    # if verbose:
+    #     print('eval/rev_count mean {:.2f} median {:.2f}'.format(\
+    #         np.mean(rev_count), np.median(rev_count)))
+    #     print('eval/nearest_prob mean {:.2f} median {:.2f}'.format(\
+    #         np.mean(nearest_prob), np.median(nearest_prob)))
+    #     print('eval/nearest_dist_per_rev mean{: .2f} median {: .2f}'.format(\
+    #         np.mean(nearest_dist_per_rev), np.median(nearest_dist_per_rev)))
+    #     print('eval/true_dist_per_rev mean{: .2f} median {: .2f}'.format(\
+    #         np.mean(true_dist_per_rev), np.median(true_dist_per_rev)))
+    #
+    # df = pd.DataFrame({'reward': [], "order_num": []})
+    # df.to_csv("./data/plot_{}.csv".format(int(random_rate)), index=False, sep=',')
+    # reward = np.mean(eval_episode_rewards)
+    # orders = np.mean(nums_complete_orders)
+    # reward = round(reward, 6)
+    #
+    # data = [reward, orders]
+    # df = pd.read_csv('./data/plot_{}.csv'.format(int(random_rate)))
+    # df.loc[1] = data
+    # df.to_csv("./data/plot_{}.csv".format(int(random_rate)), index=False, sep=',')
+
     if do_plot_congestion:
         plot_congestion(mean_velocities, edge_position['edge_position'], statistics, save_path, ckpt)
         # plot_co_emission(np.array(background_velocities), np.array(background_cos), np.array(taxi_velocities), np.array(taxi_cos), save_path, ckpt, num_processes=num_processes)
         # plot_emission(np.array(background_velocities), np.array(background_co2s), np.array(taxi_velocities), np.array(taxi_co2s), save_path, ckpt, np.array(total_taxi_distances), num_processes=num_processes)
+
+    # plot_fluctuation(avg_car_num)
+
+def plot_fluctuation(avg_car_num):
+    X = range(500)
+    plt.plot(X, avg_car_num['occupied_car'] + avg_car_num['pick_up_car'], label='free car')
+    plt.plot(X, avg_car_num['occupied_car'], label='occupied car')
+    plt.plot(X, avg_car_num['pick_up_car'], label='pick_up_car')
+    plt.legend()
+    plt.savefig('cycle_non_joint.png', dpi=600)
 
 def get_corners(s, e, w):
     s, e = np.array(s), np.array(e)
@@ -274,7 +357,6 @@ def plot(statistics, edge_position, key1, key2, name, n, m, idx, cmap, tp=None, 
         cnts = np.mean([sta[key1][key2] for sta in statistics], axis=0)
     else:
         cnts = np.mean([sta[key1][key2][tp] for sta in statistics], axis=0)
-    print(cnts.max())
     if norm:
         cnts /= cnts.max()
     colors = []
@@ -313,13 +395,20 @@ def draw(plotter, n_tp, cmap, ckpt, save_path, norm=True):
     # plotter('route', 'background', 'background', 3, 2, 3, cmap)
     ## free
     plotter = partial(plotter, norm=norm)
-    plotter('route', 'free', 'free', 2, n_tp + 1, n_tp + 1, cmap, vmin=0, vmax=30)
+    plotter('route', 'free', 'free', 2, n_tp + 2, n_tp + 1, cmap, vmin=0, vmax=30)
+
     ## reposition
-    plotter('location', 'reposition', 'reposition location', 2, n_tp + 1, 2 * n_tp + 2, cmap, vmin=0, vmax=20)
+    plotter('location', 'reposition', 'reposition location', 2, n_tp + 2, 2 * n_tp + 2 + 1, cmap, vmin=0, vmax=20)
 
     for i in range(n_tp):
-        plotter('route', 'pickup', 'pickup {}'.format(i), 2, n_tp + 1, i + 1, cmap, tp=i, vmin=0, vmax=10)
-        plotter('route', 'occupied', 'occupied {}'.format(i), 2, n_tp + 1, i + n_tp + 2, cmap, tp=i, vmin=0, vmax=10)
+            plotter('route', 'pickup', 'pickup {}'.format(i), 2, n_tp + 2, i + 1, cmap, tp=i, vmin=0, vmax=10)
+            plotter('route', 'occupied', 'occupied {}'.format(i), 2, n_tp + 2, i + n_tp + 2 + 1, cmap, tp=i, vmin=0, vmax=10)
+
+    # for i in range(n_tp):
+    #     plotter('route', 'occupied', 'route for type {} order'.format(i), 1, 2, i+1, cmap, tp=i, vmin=0, vmax=10)
+
+    # plotter('destination', 'destination', 'destination', 2, n_tp + 2, n_tp + 2, cmap, vmin=0, vmax=8)
+
     ## pickup0
     # plotter('route', 'pickup', 'pickup 0', 2, 2, 1, cmap, tp=0)
     ## pickup1
@@ -329,8 +418,10 @@ def draw(plotter, n_tp, cmap, ckpt, save_path, norm=True):
     ## occupied1
     # plotter('route', 'occupied', 'occupied 1', 3, 3, 5, cmap, tp=1)
 
-    plt.suptitle('routes_and_locations from ckpt {}'.format(ckpt), y=0.00)
+    # plt.suptitle('routes_and_locations from ckpt {}'.format(ckpt), y=0.00)
     plt.tight_layout()
+    # plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.{}.jpg'.format(ckpt, norm)), \
+    #     dpi=500, bbox_inches='tight')
     plt.savefig(os.path.join(save_path, 'routes_and_locations_{}.{}.jpg'.format(ckpt, norm)), \
         dpi=500, bbox_inches='tight')
 
@@ -354,6 +445,7 @@ def plot_congestion(mean_velocities, edge_position, statistics, save_path, ckpt)
     # plt.savefig(os.path.join(save_path, 'distribution_{}.jpg'.format(ckpt)), dpi=500)
     cmap1 = plt.get_cmap('Greys')
     cmap2 = plt.get_cmap('YlGn')
+    plt.figure(figsize=(6,4))
     plotter = partial(plot, statistics, edge_position)
     # draw(plotter, 2, cmap1, ckpt, save_path, norm=True)
     draw(plotter, 2, cmap2, ckpt, save_path, norm=False)
